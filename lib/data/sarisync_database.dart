@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:io';
-
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 
 class InsufficientStockException implements Exception {
@@ -65,6 +65,30 @@ class Product {
       imagePath: imagePath ?? this.imagePath,
     );
   }
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'barCode': barCode,
+    'name': name,
+    'category': category,
+    'costPrice': costPrice,
+    'sellingPrice': sellingPrice,
+    'stockQuantity': stockQuantity,
+    'minStockAlert': minStockAlert,
+    'imagePath': imagePath,
+  };
+
+  factory Product.fromMap(Map<String, dynamic> map) => Product(
+    id: map['id'] as String,
+    barCode: map['barCode'] as String?,
+    name: map['name'] as String,
+    category: map['category'] as String,
+    costPrice: (map['costPrice'] as num).toDouble(),
+    sellingPrice: (map['sellingPrice'] as num).toDouble(),
+    stockQuantity: map['stockQuantity'] as int,
+    minStockAlert: map['minStockAlert'] as int? ?? 5,
+    imagePath: map['imagePath'] as String?,
+  );
 }
 
 class SalesOrder {
@@ -145,6 +169,28 @@ class Debt {
       status: status ?? this.status,
     );
   }
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'customerName': customerName,
+    'customerContact': customerContact,
+    'orderId': orderId,
+    'amountDue': amountDue,
+    'amountPaid': amountPaid,
+    'dueDate': dueDate?.toIso8601String(),
+    'status': status,
+  };
+
+  factory Debt.fromMap(Map<String, dynamic> map) => Debt(
+    id: map['id'] as String,
+    customerName: map['customerName'] as String,
+    customerContact: map['customerContact'] as String?,
+    orderId: map['orderId'] as String?,
+    amountDue: (map['amountDue'] as num).toDouble(),
+    amountPaid: (map['amountPaid'] as num?)?.toDouble() ?? 0.0,
+    dueDate: map['dueDate'] != null ? DateTime.parse(map['dueDate'] as String) : null,
+    status: map['status'] as String,
+  );
 }
 
 class CashFlowLog {
@@ -197,42 +243,125 @@ class AppDatabase {
   static AppDatabase get instance => _instance;
   AppDatabase._internal();
 
-  final List<Product> _products = [];
-  final List<SalesOrder> _salesOrders = [];
-  final List<SalesItem> _salesItems = [];
-  final List<Debt> _debts = [];
-  final List<CashFlowLog> _cashFlowLogs = [];
-
+  Database? _db;
   final _productsController = StreamController<List<Product>>.broadcast();
   final _debtsController = StreamController<List<Debt>>.broadcast();
 
+  Future<Database> get database async {
+    if (_db != null) return _db!;
+    _db = await _initDatabase();
+    return _db!;
+  }
+
+  Future<Database> _initDatabase() async {
+    final dbPath = await getDatabasesPath();
+    final path = p.join(dbPath, 'sarisync.db');
+
+    return await openDatabase(
+      path,
+      version: 1,
+      onCreate: (db, version) async {
+        await db.execute('''
+          CREATE TABLE products (
+            id TEXT PRIMARY KEY,
+            barCode TEXT,
+            name TEXT NOT NULL,
+            category TEXT NOT NULL,
+            costPrice REAL NOT NULL,
+            sellingPrice REAL NOT NULL,
+            stockQuantity INTEGER NOT NULL,
+            minStockAlert INTEGER DEFAULT 5,
+            imagePath TEXT
+          )
+        ''');
+
+        await db.execute('''
+          CREATE TABLE sales_orders (
+            id TEXT PRIMARY KEY,
+            transactionDate TEXT NOT NULL,
+            totalAmount REAL NOT NULL,
+            discount REAL DEFAULT 0.0,
+            paymentType TEXT NOT NULL,
+            status TEXT NOT NULL
+          )
+        ''');
+
+        await db.execute('''
+          CREATE TABLE sales_items (
+            id TEXT PRIMARY KEY,
+            orderId TEXT NOT NULL,
+            productId TEXT NOT NULL,
+            quantity INTEGER NOT NULL,
+            unitPriceAtSale REAL NOT NULL,
+            unitCostAtSale REAL NOT NULL,
+            FOREIGN KEY (orderId) REFERENCES sales_orders(id),
+            FOREIGN KEY (productId) REFERENCES products(id)
+          )
+        ''');
+
+        await db.execute('''
+          CREATE TABLE debts (
+            id TEXT PRIMARY KEY,
+            customerName TEXT NOT NULL,
+            customerContact TEXT,
+            orderId TEXT,
+            amountDue REAL NOT NULL,
+            amountPaid REAL DEFAULT 0.0,
+            dueDate TEXT,
+            status TEXT NOT NULL
+          )
+        ''');
+
+        await db.execute('''
+          CREATE TABLE cash_flow_logs (
+            id TEXT PRIMARY KEY,
+            timestamp TEXT NOT NULL,
+            type TEXT NOT NULL,
+            amount REAL NOT NULL,
+            description TEXT NOT NULL
+          )
+        ''');
+      },
+    );
+  }
+
   Stream<List<Product>> watchInventory() {
-    _productsController.add(_products);
+    _loadProducts();
     return _productsController.stream;
   }
 
-  Future<void> deleteProductAndCleanStorage(Product product) async {
-    _products.removeWhere((p) => p.id == product.id);
-    if (product.imagePath != null) {
-      final file = File(product.imagePath!);
-      if (await file.exists()) {
-        await file.delete();
-      }
+  Future<void> _loadProducts() async {
+    try {
+      final db = await database;
+      final maps = await db.query('products');
+      final products = maps.map((m) => Product.fromMap(m)).toList();
+      _productsController.add(products);
+    } catch (e) {
+      _productsController.addError(e);
     }
-    _productsController.add(_products);
+  }
+
+  Future<void> deleteProductAndCleanStorage(Product product) async {
+    final db = await database;
+    await db.delete('products', where: 'id = ?', whereArgs: [product.id]);
+    await _loadProducts();
   }
 
   Future<void> addProduct(Product product) async {
-    _products.add(product);
-    _productsController.add(_products);
+    final db = await database;
+    await db.insert('products', product.toMap());
+    await _loadProducts();
   }
 
   Future<void> updateProduct(Product product) async {
-    final index = _products.indexWhere((p) => p.id == product.id);
-    if (index >= 0) {
-      _products[index] = product;
-      _productsController.add(_products);
-    }
+    final db = await database;
+    await db.update(
+      'products',
+      product.toMap(),
+      where: 'id = ?',
+      whereArgs: [product.id],
+    );
+    await _loadProducts();
   }
 
   Future<void> checkoutCart({
@@ -245,10 +374,29 @@ class AppDatabase {
     String? customerContact,
     DateTime? debtDueDate,
   }) async {
-    for (final item in items) {
-      final productIndex = _products.indexWhere((p) => p.id == item.productId);
-      if (productIndex >= 0) {
-        final product = _products[productIndex];
+    final db = await database;
+    final uuid = const Uuid();
+    final now = DateTime.now().toIso8601String();
+
+    await db.transaction((txn) async {
+      await txn.insert('sales_orders', {
+        'id': orderId,
+        'transactionDate': now,
+        'totalAmount': grossTotal - discount,
+        'discount': discount,
+        'paymentType': paymentMethod,
+        'status': paymentMethod == 'Utang' ? 'Unpaid' : 'Paid',
+      });
+
+      for (final item in items) {
+        final products = await txn.query(
+          'products',
+          where: 'id = ?',
+          whereArgs: [item.productId],
+        );
+        if (products.isEmpty) continue;
+        
+        final product = Product.fromMap(products.first);
         if (item.quantity > product.stockQuantity) {
           throw InsufficientStockException(
             productName: product.name,
@@ -256,139 +404,142 @@ class AppDatabase {
             availableStock: product.stockQuantity,
           );
         }
-      }
-    }
 
-    final uuid = const Uuid();
-    final now = DateTime.now();
+        await txn.insert('sales_items', {
+          'id': uuid.v4(),
+          'orderId': orderId,
+          'productId': item.productId,
+          'quantity': item.quantity,
+          'unitPriceAtSale': item.unitPrice,
+          'unitCostAtSale': item.unitCost,
+        });
 
-    final order = SalesOrder(
-      id: orderId,
-      transactionDate: now,
-      totalAmount: grossTotal - discount,
-      discount: discount,
-      paymentType: paymentMethod,
-      status: paymentMethod == 'Utang' ? 'Unpaid' : 'Paid',
-    );
-    _salesOrders.add(order);
-
-    for (final item in items) {
-      final salesItem = SalesItem(
-        id: uuid.v4(),
-        orderId: orderId,
-        productId: item.productId,
-        quantity: item.quantity,
-        unitPriceAtSale: item.unitPrice,
-        unitCostAtSale: item.unitCost,
-      );
-      _salesItems.add(salesItem);
-
-      final productIndex = _products.indexWhere((p) => p.id == item.productId);
-      if (productIndex >= 0) {
-        final product = _products[productIndex];
-        _products[productIndex] = product.copyWith(
-          stockQuantity: product.stockQuantity - item.quantity,
+        await txn.update(
+          'products',
+          {'stockQuantity': product.stockQuantity - item.quantity},
+          where: 'id = ?',
+          whereArgs: [item.productId],
         );
       }
-    }
-    _productsController.add(_products);
 
-    if (paymentMethod == 'Utang' && customerName != null) {
-      final debt = Debt(
-        id: uuid.v4(),
-        customerName: customerName,
-        customerContact: customerContact,
-        orderId: orderId,
-        amountDue: grossTotal - discount,
-        dueDate: debtDueDate,
-        status: 'Active',
-      );
-      _debts.add(debt);
-      _debtsController.add(_debts);
-    }
+      if (paymentMethod == 'Utang' && customerName != null) {
+        await txn.insert('debts', {
+          'id': uuid.v4(),
+          'customerName': customerName,
+          'customerContact': customerContact,
+          'orderId': orderId,
+          'amountDue': grossTotal - discount,
+          'amountPaid': 0.0,
+          'dueDate': debtDueDate?.toIso8601String(),
+          'status': 'Active',
+        });
+      }
 
-    if (paymentMethod != 'Utang') {
-      final cashFlow = CashFlowLog(
-        id: uuid.v4(),
-        timestamp: now,
-        type: 'IN',
-        amount: grossTotal - discount,
-        description: 'Sale - $orderId',
+      if (paymentMethod != 'Utang') {
+        await txn.insert('cash_flow_logs', {
+          'id': uuid.v4(),
+          'timestamp': now,
+          'type': 'IN',
+          'amount': grossTotal - discount,
+          'description': 'Sale - $orderId',
+        });
+      }
+    });
+
+    await _loadProducts();
+    _loadActiveDebts();
+  }
+
+  void _loadActiveDebts() async {
+    try {
+      final db = await database;
+      final maps = await db.query(
+        'debts',
+        where: 'status = ?',
+        whereArgs: ['Active'],
       );
-      _cashFlowLogs.add(cashFlow);
+      final debts = maps.map((m) => Debt.fromMap(m)).toList();
+      _debtsController.add(debts);
+    } catch (e) {
+      _debtsController.addError(e);
     }
   }
 
   Stream<List<Debt>> watchActiveCreditLines() {
-    final activeDebts = _debts.where((d) => d.status == 'Active').toList();
-    _debtsController.add(activeDebts);
+    _loadActiveDebts();
     return _debtsController.stream;
   }
 
   Future<void> receiveDebtPayment(String debtId, double collectedAmount) async {
-    final index = _debts.indexWhere((d) => d.id == debtId);
-    if (index >= 0) {
-      final debt = _debts[index];
-      final newAmountPaid = debt.amountPaid + collectedAmount;
-      final uuid = const Uuid();
+    final db = await database;
+    final uuid = const Uuid();
 
-      if (newAmountPaid >= debt.amountDue) {
-        _debts[index] = debt.copyWith(
-          amountPaid: debt.amountDue,
-          status: 'Settled',
-        );
-        _cashFlowLogs.add(CashFlowLog(
-          id: uuid.v4(),
-          timestamp: DateTime.now(),
-          type: 'IN',
-          amount: collectedAmount,
-          description: 'Debt Payment - $debtId',
-        ));
-      } else {
-        _debts[index] = debt.copyWith(amountPaid: newAmountPaid);
-        _cashFlowLogs.add(CashFlowLog(
-          id: uuid.v4(),
-          timestamp: DateTime.now(),
-          type: 'IN',
-          amount: collectedAmount,
-          description: 'Partial Debt Payment - $debtId',
-        ));
-      }
-      _debtsController.add(_debts.where((d) => d.status == 'Active').toList());
-    }
+    await db.transaction((txn) async {
+      final debts = await txn.query(
+        'debts',
+        where: 'id = ?',
+        whereArgs: [debtId],
+      );
+
+      if (debts.isEmpty) return;
+
+      final debt = Debt.fromMap(debts.first);
+      final newAmountPaid = debt.amountPaid + collectedAmount;
+      final isSettled = newAmountPaid >= debt.amountDue;
+
+      await txn.update(
+        'debts',
+        {
+          'amountPaid': isSettled ? debt.amountDue : newAmountPaid,
+          'status': isSettled ? 'Settled' : 'Active',
+        },
+        where: 'id = ?',
+        whereArgs: [debtId],
+      );
+
+      await txn.insert('cash_flow_logs', {
+        'id': uuid.v4(),
+        'timestamp': DateTime.now().toIso8601String(),
+        'type': 'IN',
+        'amount': collectedAmount,
+        'description': isSettled ? 'Full Debt Payment - $debtId' : 'Partial Debt Payment - $debtId',
+      });
+    });
+
+    _loadActiveDebts();
   }
 
   Future<DailyFinancialSummary> computeAuditedMetricsForDate(DateTime lookupDate) async {
-    final startOfDay = DateTime(lookupDate.year, lookupDate.month, lookupDate.day);
-    final endOfDay = startOfDay.add(const Duration(days: 1));
+    final db = await database;
+    final startOfDay = DateTime(lookupDate.year, lookupDate.month, lookupDate.day).toIso8601String();
+    final endOfDay = DateTime(lookupDate.year, lookupDate.month, lookupDate.day + 1).toIso8601String();
 
-    final ordersOfDay = _salesOrders.where((o) =>
-        o.transactionDate.isAfter(startOfDay.subtract(const Duration(seconds: 1))) &&
-        o.transactionDate.isBefore(endOfDay)).toList();
+    final orders = await db.query(
+      'sales_orders',
+      where: 'transactionDate >= ? AND transactionDate < ?',
+      whereArgs: [startOfDay, endOfDay],
+    );
 
-    final orderIds = ordersOfDay.map((o) => o.id).toSet();
-    final itemsOfDay = _salesItems.where((i) => orderIds.contains(i.orderId)).toList();
-
-    final expensesOfDay = _cashFlowLogs.where((l) =>
-        l.type == 'OUT' &&
-        l.timestamp.isAfter(startOfDay.subtract(const Duration(seconds: 1))) &&
-        l.timestamp.isBefore(endOfDay)).toList();
-
-    double grossRevenue = 0;
-    double totalCogs = 0;
-
-    for (final order in ordersOfDay) {
-      grossRevenue += order.totalAmount;
+    final orderIds = orders.map((o) => o['id'] as String).toList();
+    if (orderIds.isEmpty) {
+      return DailyFinancialSummary(grossRevenue: 0, cogs: 0, expenses: 0, netMargin: 0);
     }
 
-    for (final item in itemsOfDay) {
-      totalCogs += item.unitCostAtSale * item.quantity;
-    }
+    final placeholders = List.filled(orderIds.length, '?').join(',');
+    final items = await db.rawQuery(
+      'SELECT * FROM sales_items WHERE orderId IN ($placeholders)',
+      orderIds,
+    );
 
-    double totalExpenses = 0;
-    for (final expense in expensesOfDay) {
-      totalExpenses += expense.amount;
-    }
+    double grossRevenue = orders.fold(0.0, (sum, o) => sum + ((o['totalAmount'] as num).toDouble()));
+    double totalCogs = items.fold(0.0, (sum, i) => sum + ((i['unitCostAtSale'] as num).toDouble() * (i['quantity'] as int)));
+
+    final expenses = await db.query(
+      'cash_flow_logs',
+      where: 'type = ? AND timestamp >= ? AND timestamp < ?',
+      whereArgs: ['OUT', startOfDay, endOfDay],
+    );
+    double totalExpenses = expenses.fold(0.0, (sum, e) => sum + ((e['amount'] as num).toDouble()));
 
     return DailyFinancialSummary(
       grossRevenue: grossRevenue,
@@ -399,40 +550,58 @@ class AppDatabase {
   }
 
   Future<List<SalesItem>> getSalesItemsForDate(DateTime lookupDate) async {
-    final startOfDay = DateTime(lookupDate.year, lookupDate.month, lookupDate.day);
-    final endOfDay = startOfDay.add(const Duration(days: 1));
+    final db = await database;
+    final startOfDay = DateTime(lookupDate.year, lookupDate.month, lookupDate.day).toIso8601String();
+    final endOfDay = DateTime(lookupDate.year, lookupDate.month, lookupDate.day + 1).toIso8601String();
 
-    final ordersOfDay = _salesOrders.where((o) =>
-        o.transactionDate.isAfter(startOfDay.subtract(const Duration(seconds: 1))) &&
-        o.transactionDate.isBefore(endOfDay)).toList();
+    final orders = await db.query(
+      'sales_orders',
+      where: 'transactionDate >= ? AND transactionDate < ?',
+      whereArgs: [startOfDay, endOfDay],
+    );
 
-    final orderIds = ordersOfDay.map((o) => o.id).toSet();
-    return _salesItems.where((i) => orderIds.contains(i.orderId)).toList();
+    final orderIds = orders.map((o) => o['id'] as String).toList();
+    if (orderIds.isEmpty) return [];
+
+    final placeholders = List.filled(orderIds.length, '?').join(',');
+    final items = await db.rawQuery(
+      'SELECT * FROM sales_items WHERE orderId IN ($placeholders)',
+      orderIds,
+    );
+
+    return items.map((i) => SalesItem(
+      id: i['id'] as String,
+      orderId: i['orderId'] as String,
+      productId: i['productId'] as String,
+      quantity: i['quantity'] as int,
+      unitPriceAtSale: (i['unitPriceAtSale'] as num).toDouble(),
+      unitCostAtSale: (i['unitCostAtSale'] as num).toDouble(),
+    )).toList();
   }
 
   Future<List<Product>> getProductsForItems(List<SalesItem> items) async {
-    final productMap = <String, Product>{};
-    for (final item in items) {
-      final productIndex = _products.indexWhere((p) => p.id == item.productId);
-      if (productIndex >= 0 && !productMap.containsKey(item.productId)) {
-        productMap[item.productId] = _products[productIndex];
-      }
-    }
-    return productMap.values.toList();
+    final db = await database;
+    final productIds = items.map((i) => i.productId).toList();
+    if (productIds.isEmpty) return [];
+
+    final placeholders = List.filled(productIds.length, '?').join(',');
+    final maps = await db.rawQuery(
+      'SELECT * FROM products WHERE id IN ($placeholders)',
+      productIds,
+    );
+    return maps.map((m) => Product.fromMap(m)).toList();
   }
 
-  Future<void> addExpense({
-    required String description,
-    required double amount,
-  }) async {
+  Future<void> addExpense({required String description, required double amount}) async {
+    final db = await database;
     final uuid = const Uuid();
-    _cashFlowLogs.add(CashFlowLog(
-      id: uuid.v4(),
-      timestamp: DateTime.now(),
-      type: 'OUT',
-      amount: amount,
-      description: description,
-    ));
+    await db.insert('cash_flow_logs', {
+      'id': uuid.v4(),
+      'timestamp': DateTime.now().toIso8601String(),
+      'type': 'OUT',
+      'amount': amount,
+      'description': description,
+    });
   }
 
   void dispose() {
