@@ -1,10 +1,12 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
+import 'package:image/image.dart' as img;
 import '../data/sarisync_database.dart';
 
 part 'sarisync_blocs_event.dart';
@@ -15,9 +17,23 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
 
   InventoryBloc(this._db) : super(InventoryInitial()) {
     on<LoadInventory>(_onLoadInventory);
+    on<InventoryUpdated>(_onInventoryUpdated);
     on<AddProduct>(_onAddProduct);
     on<UpdateProduct>(_onUpdateProduct);
     on<DeleteProduct>(_onDeleteProduct);
+  }
+
+  Future<void> _onInventoryUpdated(InventoryUpdated event, Emitter<InventoryState> emit) async {
+    try {
+      if (event.products.isEmpty) {
+        final products = await _db.watchInventory().first;
+        emit(products.isEmpty ? InventoryLoaded(const []) : InventoryLoaded(products));
+      } else {
+        emit(InventoryLoaded(event.products));
+      }
+    } catch (e) {
+      emit(InventoryError(e.toString()));
+    }
   }
 
   Future<void> _onLoadInventory(LoadInventory event, Emitter<InventoryState> emit) async {
@@ -303,20 +319,27 @@ class ImageHelper {
     }
   }
 
-  static Future<String> _compressImage(String sourcePath, String targetPath) async {
-    final sourceFile = File(sourcePath);
-    final bytes = await sourceFile.readAsBytes();
+  static Future<String?> _compressImage(String sourcePath, String targetPath, {int targetSizeBytes = 200 * 1024}) async {
+    try {
+      final sourceFile = File(sourcePath);
+      final originalBytes = await sourceFile.readAsBytes();
 
-    int quality = 85;
-    List<int> compressedBytes = bytes;
+      final image = img.decodeImage(originalBytes);
+      if (image == null) return null;
 
-    while (compressedBytes.length > 200 * 1024 && quality > 20) {
-      quality -= 10;
-      compressedBytes = bytes;
+      int quality = 90;
+      List<int> compressedBytes;
+
+      do {
+        compressedBytes = img.encodeJpg(image, quality: quality);
+        quality -= 10;
+      } while (compressedBytes.length > targetSizeBytes && quality >= 20);
+
+      final targetFile = File(targetPath);
+      await targetFile.writeAsBytes(compressedBytes);
+      return targetPath;
+    } catch (e) {
+      return null;
     }
-
-    final targetFile = File(targetPath);
-    await targetFile.writeAsBytes(compressedBytes);
-    return targetPath;
   }
 }

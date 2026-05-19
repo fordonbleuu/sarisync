@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../blocs/sarisync_blocs.dart';
 import '../data/sarisync_database.dart';
 import '../design_system/sari_design_system.dart';
+import 'widgets/stock_aware_quantity_spinner.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -273,32 +274,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ],
               ),
             ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.remove_circle_outline),
-                  color: selectedQty > 0 ? Colors.red : Colors.grey,
-                  onPressed: isOutOfStock ? null : () => _removeItem(product),
-                ),
-                Container(
-                  constraints: const BoxConstraints(minWidth: 30),
-                  child: Text(
-                    '$selectedQty',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: selectedQty > 0 ? Theme.of(context).colorScheme.primary : Colors.grey,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.add_circle_outline),
-                  color: isOutOfStock ? Colors.grey : Theme.of(context).colorScheme.primary,
-                  onPressed: isOutOfStock ? null : () => _addItem(product),
-                ),
-              ],
+            StockAwareQuantitySpinner(
+              quantity: selectedQty,
+              maxStock: product.stockQuantity,
+              enabled: !isOutOfStock,
+              onChanged: (newQty) {
+                if (newQty > selectedQty) {
+                  _addItem(product);
+                } else {
+                  _removeItem(product);
+                }
+              },
             ),
           ],
         ),
@@ -508,29 +494,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(width: 8),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.remove, size: 18),
-                  onPressed: () => _updateQuantity(product, quantity - 1),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                  child: Text(
-                    '$quantity',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.add, size: 18),
-                  onPressed: () => _updateQuantity(product, quantity + 1),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-              ],
+            StockAwareQuantityInput(
+              quantity: quantity,
+              maxStock: product.stockQuantity,
+              onChanged: (newQty) => _updateQuantity(product, newQty),
             ),
             IconButton(
               icon: const Icon(Icons.delete, size: 18, color: Colors.red),

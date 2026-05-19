@@ -42,10 +42,13 @@ dependencies:
   path: ^1.9.0
   shared_preferences: ^2.3.3
   google_fonts: ^8.1.0
+  image: ^4.3.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  drift_dev: ^2.22.1
+  build_runner: ^2.4.13
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is

@@ -3,6 +3,22 @@ import 'dart:io';
 
 import 'package:uuid/uuid.dart';
 
+class InsufficientStockException implements Exception {
+  final String productName;
+  final int requestedQuantity;
+  final int availableStock;
+
+  InsufficientStockException({
+    required this.productName,
+    required this.requestedQuantity,
+    required this.availableStock,
+  });
+
+  @override
+  String toString() =>
+      'Insufficient stock for "$productName": requested $requestedQuantity, available $availableStock';
+}
+
 class Product {
   final String id;
   final String? barCode;
@@ -229,6 +245,20 @@ class AppDatabase {
     String? customerContact,
     DateTime? debtDueDate,
   }) async {
+    for (final item in items) {
+      final productIndex = _products.indexWhere((p) => p.id == item.productId);
+      if (productIndex >= 0) {
+        final product = _products[productIndex];
+        if (item.quantity > product.stockQuantity) {
+          throw InsufficientStockException(
+            productName: product.name,
+            requestedQuantity: item.quantity,
+            availableStock: product.stockQuantity,
+          );
+        }
+      }
+    }
+
     final uuid = const Uuid();
     final now = DateTime.now();
 
