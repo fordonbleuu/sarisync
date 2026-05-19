@@ -63,8 +63,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         children: [
-          SizedBox(
-            width: 160,
+          Expanded(
             child: SariStatCard(
               title: 'Total Products',
               value: '$totalProducts',
@@ -73,8 +72,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          SizedBox(
-            width: 160,
+          Expanded(
             child: SariStatCard(
               title: 'Total Stock',
               value: '$totalStock',
@@ -83,8 +81,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          SizedBox(
-            width: 160,
+          Expanded(
             child: SariStatCard(
               title: 'Out of Stock',
               value: '$outOfStock',
@@ -93,8 +90,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          SizedBox(
-            width: 160,
+          Expanded(
             child: SariStatCard(
               title: 'Inventory Value',
               value: '₱${totalValue.toStringAsFixed(0)}',
@@ -302,7 +298,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     children: [
                       _buildPriceTag('Cost', product.costPrice),
                       const SizedBox(width: 8),
-                      _buildPriceTag('Sell', product.sellingPrice, isPrimary: true),
+                      Flexible(
+                        child: _buildPriceTag('Sell', product.sellingPrice, isPrimary: true),
+                      ),
                       const Spacer(),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -374,6 +372,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           fontWeight: isPrimary ? FontWeight.bold : FontWeight.normal,
           color: isPrimary ? Theme.of(context).colorScheme.onPrimaryContainer : Colors.grey.shade700,
         ),
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }

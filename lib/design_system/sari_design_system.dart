@@ -412,11 +412,14 @@ class SariStatCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Text(
-            value,
-            style: theme.textTheme.headlineMedium?.copyWith(
-              color: SariColors.textPrimary,
-              fontWeight: FontWeight.w700,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              style: theme.textTheme.headlineMedium?.copyWith(
+                color: SariColors.textPrimary,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
           if (subtitle != null) ...[
