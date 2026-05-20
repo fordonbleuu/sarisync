@@ -306,18 +306,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 8),
-                  Row(
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
                     children: [
-                      Flexible(
-                        child: _buildPriceTag('Cost', product.costPrice),
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: _buildPriceTag('Sell', product.sellingPrice, isPrimary: true),
-                      ),
-                      const SizedBox(width: 8),
+                      _buildPriceTag('Cost', product.costPrice),
+                      _buildPriceTag('Sell', product.sellingPrice, isPrimary: true),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
                           color: SariColors.primaryGreen.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
@@ -327,6 +323,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             color: SariColors.primaryGreen,
+                            fontSize: 12,
                           ),
                         ),
                       ),
