@@ -78,6 +78,21 @@ class CartSuccess extends CartState {
   List<Object?> get props => [message];
 }
 
+class CartCheckoutSuccess extends CartState {
+  final List<CartItem> items;
+  final double discount;
+  final String message;
+
+  const CartCheckoutSuccess({
+    required this.items,
+    required this.discount,
+    required this.message,
+  });
+
+  @override
+  List<Object?> get props => [items, discount, message];
+}
+
 class CartError extends CartState {
   final String message;
 

@@ -136,7 +136,7 @@ class AppDatabase extends _$AppDatabase {
         await decrementStock(item.productId, item.quantity);
       }
 
-      if (paymentType == 'Cash' || paymentType == 'Cash') {
+      if (paymentType == 'Cash') {
         await into(cashFlowLogs).insert(CashFlowLogsCompanion.insert(
           type: 'IN',
           amount: totalAmount - discount,

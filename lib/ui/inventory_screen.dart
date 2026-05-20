@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -17,6 +18,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   bool _isLoading = true;
   String _searchQuery = '';
   String _selectedCategory = 'All';
+  StreamSubscription<List<Product>>? _productSubscription;
 
   @override
   void initState() {
@@ -25,7 +27,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   void _loadProducts() {
-    AppDatabase.instance.watchInventory().listen((products) {
+    _productSubscription = AppDatabase.instance.watchInventory().listen((products) {
       if (mounted) {
         setState(() {
           _products = products;
@@ -33,6 +35,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
         });
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _productSubscription?.cancel();
+    super.dispose();
   }
 
   List<String> get _categories {
@@ -63,7 +71,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         children: [
-          Expanded(
+          SizedBox(
+            width: 160,
             child: SariStatCard(
               title: 'Total Products',
               value: '$totalProducts',
@@ -72,7 +81,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          Expanded(
+          SizedBox(
+            width: 160,
             child: SariStatCard(
               title: 'Total Stock',
               value: '$totalStock',
@@ -81,7 +91,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          Expanded(
+          SizedBox(
+            width: 160,
             child: SariStatCard(
               title: 'Out of Stock',
               value: '$outOfStock',
@@ -90,7 +101,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          Expanded(
+          SizedBox(
+            width: 160,
             child: SariStatCard(
               title: 'Inventory Value',
               value: '₱${totalValue.toStringAsFixed(0)}',
@@ -296,12 +308,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      _buildPriceTag('Cost', product.costPrice),
+                      Flexible(
+                        child: _buildPriceTag('Cost', product.costPrice),
+                      ),
                       const SizedBox(width: 8),
                       Flexible(
                         child: _buildPriceTag('Sell', product.sellingPrice, isPrimary: true),
                       ),
-                      const Spacer(),
+                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
@@ -365,14 +379,17 @@ class _InventoryScreenState extends State<InventoryScreen> {
         color: isPrimary ? Theme.of(context).colorScheme.primaryContainer : Colors.grey.shade200,
         borderRadius: BorderRadius.circular(4),
       ),
-      child: Text(
-        '$label: ₱${price.toStringAsFixed(2)}',
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: isPrimary ? FontWeight.bold : FontWeight.normal,
-          color: isPrimary ? Theme.of(context).colorScheme.onPrimaryContainer : Colors.grey.shade700,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          '$label: ₱${price.toStringAsFixed(2)}',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: isPrimary ? FontWeight.bold : FontWeight.normal,
+            color: isPrimary ? Theme.of(context).colorScheme.onPrimaryContainer : Colors.grey.shade700,
+          ),
+          overflow: TextOverflow.ellipsis,
         ),
-        overflow: TextOverflow.ellipsis,
       ),
     );
   }

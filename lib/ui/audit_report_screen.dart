@@ -163,22 +163,30 @@ class _AuditReportScreenState extends State<AuditReportScreen> {
             icon: const Icon(Icons.chevron_left),
             onPressed: () => _navigateDate(-1),
           ),
-          InkWell(
-            onTap: _selectDate,
-            child: Row(
-              children: [
-                const Icon(Icons.calendar_today, size: 18),
-                const SizedBox(width: 8),
-                Text(
-                  isToday
-                      ? 'Today'
-                      : DateFormat('EEEE, MMM d, yyyy').format(_selectedDate),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+          Expanded(
+            child: InkWell(
+              onTap: _selectDate,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.calendar_today, size: 18),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        isToday
+                            ? 'Today'
+                            : DateFormat('EEEE, MMM d, yyyy').format(_selectedDate),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           IconButton(
@@ -300,15 +308,18 @@ class _AuditReportScreenState extends State<AuditReportScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildMiniStat('Revenue', _summary!.grossRevenue),
-              Container(width: 1, height: 30, color: Colors.white.withValues(alpha: 0.3), margin: const EdgeInsets.symmetric(horizontal: 16)),
-              _buildMiniStat('COGS', _summary!.cogs),
-              Container(width: 1, height: 30, color: Colors.white.withValues(alpha: 0.3), margin: const EdgeInsets.symmetric(horizontal: 16)),
-              _buildMiniStat('Expenses', _summary!.expenses),
-            ],
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildMiniStat('Revenue', _summary!.grossRevenue),
+                Container(width: 1, height: 30, color: Colors.white.withValues(alpha: 0.3), margin: const EdgeInsets.symmetric(horizontal: 16)),
+                _buildMiniStat('COGS', _summary!.cogs),
+                Container(width: 1, height: 30, color: Colors.white.withValues(alpha: 0.3), margin: const EdgeInsets.symmetric(horizontal: 16)),
+                _buildMiniStat('Expenses', _summary!.expenses),
+              ],
+            ),
           ),
         ],
       ),

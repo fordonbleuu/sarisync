@@ -450,7 +450,7 @@ class AppDatabase {
     _loadActiveDebts();
   }
 
-  void _loadActiveDebts() async {
+  Future<void> _loadActiveDebts() async {
     try {
       final db = await database;
       final maps = await db.query(

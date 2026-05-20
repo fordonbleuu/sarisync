@@ -293,8 +293,6 @@ class SarisyncApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final db = AppDatabase.instance;
-    final userName = savedName;
-
     return MultiBlocProvider(
       providers: [
         BlocProvider<InventoryBloc>(
@@ -314,7 +312,7 @@ class SarisyncApp extends StatelessWidget {
         title: 'SariSync POS',
         debugShowCheckedModeBanner: false,
         theme: SariTheme.lightTheme,
-        home: MainNavigationScreen(userName: userName),
+        home: MainNavigationScreen(userName: savedName),
       ),
     );
   }
@@ -365,7 +363,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     );
   }
 
-  final List<Widget> _screens = const [
+  final List<Widget> _screens = [
     POSDashboardScreen(),
     InventoryScreen(),
     DebtLedgerScreen(),

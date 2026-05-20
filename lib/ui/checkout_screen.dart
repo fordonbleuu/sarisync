@@ -19,7 +19,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   List<Product> _products = [];
   List<Product> _filteredProducts = [];
   bool _isLoading = true;
-  Map<String, int> _selectedItems = {};
+  final Map<String, int> _selectedItems = {};
 
   @override
   void initState() {
@@ -471,36 +471,46 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         child: Row(
           children: [
             Expanded(
+              flex: 3,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     product.name,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  Text(
-                    '₱${product.sellingPrice.toStringAsFixed(2)} x $quantity',
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      '₱${product.sellingPrice.toStringAsFixed(2)} x $quantity',
+                      style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+                    ),
                   ),
                 ],
               ),
             ),
-            Text(
-              '₱${(product.sellingPrice * quantity).toStringAsFixed(2)}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+            const SizedBox(width: 4),
+            Expanded(
+              flex: 2,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Text(
+                  '₱${(product.sellingPrice * quantity).toStringAsFixed(2)}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 4),
             StockAwareQuantityInput(
               quantity: quantity,
               maxStock: product.stockQuantity,
               onChanged: (newQty) => _updateQuantity(product, newQty),
             ),
             IconButton(
-              icon: const Icon(Icons.delete, size: 18, color: Colors.red),
+              icon: const Icon(Icons.delete, size: 16, color: Colors.red),
               onPressed: () => _updateQuantity(product, 0),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
@@ -515,6 +525,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final cartItems = _cartItems;
     if (cartItems.isEmpty) return;
 
+    context.read<CartCubit>().clearCart();
     for (final entry in cartItems) {
       context.read<CartCubit>().addToCartWithQuantity(entry.key, entry.value);
     }
@@ -626,6 +637,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       final cartItems = _cartItems;
                       if (cartItems.isEmpty) return;
 
+                      context.read<CartCubit>().clearCart();
                       for (final entry in cartItems) {
                         context.read<CartCubit>().addToCartWithQuantity(entry.key, entry.value);
                       }

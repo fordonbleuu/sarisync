@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
@@ -13,6 +14,7 @@ part 'sarisync_blocs_state.dart';
 
 class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
   final AppDatabase _db;
+  StreamSubscription<List<Product>>? _productSubscription;
 
   InventoryBloc(this._db) : super(InventoryInitial()) {
     on<LoadInventory>(_onLoadInventory);
@@ -22,23 +24,21 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
     on<DeleteProduct>(_onDeleteProduct);
   }
 
+  @override
+  Future<void> close() {
+    _productSubscription?.cancel();
+    return super.close();
+  }
+
   Future<void> _onInventoryUpdated(InventoryUpdated event, Emitter<InventoryState> emit) async {
-    try {
-      if (event.products.isEmpty) {
-        final products = await _db.watchInventory().first;
-        emit(products.isEmpty ? InventoryLoaded(const []) : InventoryLoaded(products));
-      } else {
-        emit(InventoryLoaded(event.products));
-      }
-    } catch (e) {
-      emit(InventoryError(e.toString()));
-    }
+    emit(InventoryLoaded(event.products));
   }
 
   Future<void> _onLoadInventory(LoadInventory event, Emitter<InventoryState> emit) async {
     emit(InventoryLoading());
     try {
-      _db.watchInventory().listen((products) {
+      _productSubscription?.cancel();
+      _productSubscription = _db.watchInventory().listen((products) {
         if (!isClosed) {
           add(InventoryUpdated(products));
         }
@@ -148,6 +148,10 @@ class CartCubit extends Cubit<CartState> {
     }
   }
 
+  void setCartItems(List<CartItem> items) {
+    emit(CartLoaded(items: items, discount: state is CartLoaded ? (state as CartLoaded).discount : 0.0));
+  }
+
   double get subtotal {
     final currentState = state;
     if (currentState is CartLoaded) {
@@ -190,8 +194,7 @@ class CartCubit extends Cubit<CartState> {
           debtDueDate: dueDate,
         );
 
-        emit(CartLoaded(items: [], discount: 0.0));
-        emit(CartSuccess('Checkout completed successfully!'));
+        emit(CartCheckoutSuccess(items: currentState.items, discount: currentState.discount, message: 'Checkout completed successfully!'));
       } catch (e) {
         emit(CartError(e.toString()));
         emit(CartLoaded(items: currentState.items, discount: currentState.discount));
@@ -206,13 +209,21 @@ class CartCubit extends Cubit<CartState> {
 
 class DebtCubit extends Cubit<DebtState> {
   final AppDatabase _db;
+  StreamSubscription<List<Debt>>? _debtSubscription;
 
   DebtCubit(this._db) : super(DebtInitial()) {
     _loadDebts();
   }
 
+  @override
+  Future<void> close() {
+    _debtSubscription?.cancel();
+    return super.close();
+  }
+
   void _loadDebts() {
-    _db.watchActiveCreditLines().listen((debts) {
+    _debtSubscription?.cancel();
+    _debtSubscription = _db.watchActiveCreditLines().listen((debts) {
       if (!isClosed) {
         emit(DebtLoaded(debts));
       }

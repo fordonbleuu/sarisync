@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../design_system/sari_design_system.dart';
@@ -16,6 +17,7 @@ class _POSDashboardScreenState extends State<POSDashboardScreen> {
   final TextEditingController _discountController = TextEditingController();
   List<Product> _products = [];
   bool _isLoading = true;
+  StreamSubscription<List<Product>>? _productSubscription;
 
   @override
   void initState() {
@@ -25,7 +27,7 @@ class _POSDashboardScreenState extends State<POSDashboardScreen> {
 
   Future<void> _loadProducts() async {
     final db = AppDatabase.instance;
-    db.watchInventory().listen((products) {
+    _productSubscription = db.watchInventory().listen((products) {
       if (mounted) {
         setState(() {
           _products = products;
@@ -37,6 +39,7 @@ class _POSDashboardScreenState extends State<POSDashboardScreen> {
 
   @override
   void dispose() {
+    _productSubscription?.cancel();
     _discountController.dispose();
     super.dispose();
   }
@@ -262,87 +265,87 @@ class _POSDashboardScreenState extends State<POSDashboardScreen> {
             ],
           ),
           child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+            child: Row(
               children: [
+                // Cart Icon and Item Count
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1565C0),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.shopping_cart, color: Colors.white, size: 18),
+                      const SizedBox(width: 4),
+                      Text(
+                        '$itemCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Price Information
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'Subtotal: ₱${subtotal.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'Total: ₱${total.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Action Buttons
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1565C0),
-                        borderRadius: BorderRadius.circular(12),
+                    if (items.isNotEmpty)
+                      IconButton(
+                        onPressed: () {
+                          context.read<CartCubit>().clearCart();
+                          _discountController.clear();
+                        },
+                        icon: Icon(Icons.delete_outline, color: Colors.red.shade400, size: 22),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
                       ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.shopping_cart, color: Colors.white, size: 20),
-                          const SizedBox(width: 6),
-                          Text(
-                            '$itemCount items',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: items.isEmpty
+                          ? null
+                          : () => _showCheckoutSheet(context, 'Cash'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        minimumSize: const Size(0, 40),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                'Subtotal: ₱${subtotal.toStringAsFixed(2)}',
-                                style: TextStyle(
-                                  color: Colors.grey.shade600,
-                                  fontSize: 12,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            Flexible(
-                              child: Text(
-                                'Total: ₱${total.toStringAsFixed(2)}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        if (items.isNotEmpty)
-                          IconButton(
-                            onPressed: () {
-                              context.read<CartCubit>().clearCart();
-                              _discountController.clear();
-                            },
-                            icon: Icon(Icons.delete_outline, color: Colors.red.shade400),
-                          ),
-                        const SizedBox(width: 8),
-                        ElevatedButton.icon(
-                          onPressed: items.isEmpty
-                              ? null
-                              : () => _showCheckoutSheet(context, 'Cash'),
-                          icon: const Icon(Icons.money, size: 18),
-                          label: const Text('Checkout'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                          ),
-                        ),
-                      ],
+                      child: const Text('Checkout', style: TextStyle(fontSize: 13)),
                     ),
                   ],
                 ),

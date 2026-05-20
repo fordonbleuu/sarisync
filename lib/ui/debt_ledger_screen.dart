@@ -223,44 +223,55 @@ class _DebtLedgerScreenState extends State<DebtLedgerScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Amount Due',
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 12,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Amount Due',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 12,
+                        ),
                       ),
-                    ),
-                    Text(
-                      '₱${debt.amountDue.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          '₱${debt.amountDue.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      'Remaining',
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 12,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        'Remaining',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 12,
+                        ),
                       ),
-                    ),
-                    Text(
-                      '₱${remaining.toStringAsFixed(2)}',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: remaining > 0 ? Colors.red : Colors.green,
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          '₱${remaining.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: remaining > 0 ? Colors.red : Colors.green,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),

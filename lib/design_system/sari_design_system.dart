@@ -587,13 +587,17 @@ class SariProductTile extends StatelessWidget {
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          _buildPriceChip('Cost', costPrice, SariColors.textSecondary),
-                          const SizedBox(width: 8),
-                          _buildPriceChip('Sell', sellingPrice, SariColors.primaryGreen, isPrimary: true),
-                          const Spacer(),
+                          Flexible(
+                            child: _buildPriceChip('Cost', costPrice, SariColors.textSecondary),
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: _buildPriceChip('Sell', sellingPrice, SariColors.primaryGreen, isPrimary: true),
+                          ),
+                          const SizedBox(width: 4),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
+                              horizontal: 10,
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
@@ -623,7 +627,7 @@ class SariProductTile extends StatelessWidget {
 
   Widget _buildPriceChip(String label, double price, Color color, {bool isPrimary = false}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       decoration: BoxDecoration(
         color: isPrimary
             ? SariColors.primaryGreen.withValues(alpha: 0.1)
@@ -642,12 +646,17 @@ class SariProductTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 4),
-          Text(
-            '₱${price.toStringAsFixed(2)}',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: isPrimary ? SariColors.primaryGreen : SariColors.textSecondary,
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                '₱${price.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isPrimary ? SariColors.primaryGreen : SariColors.textSecondary,
+                ),
+              ),
             ),
           ),
         ],

@@ -11,7 +11,7 @@ import 'package:sarisync/main.dart';
 
 void main() {
   testWidgets('App renders smoke test', (WidgetTester tester) async {
-    await tester.pumpWidget(const SarisyncApp());
+    await tester.pumpWidget(const SarisyncApp(savedName: 'Test User'));
     expect(find.text('SariSync POS'), findsOneWidget);
   });
 }
