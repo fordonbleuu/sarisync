@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'data/sarisync_database.dart';
@@ -8,6 +9,7 @@ import 'design_system/sari_design_system.dart';
 import 'ui/pos_dashboard_screen.dart';
 import 'ui/inventory_screen.dart';
 import 'ui/debt_ledger_screen.dart';
+import 'ui/expense_screen.dart';
 import 'ui/audit_report_screen.dart';
 
 Future<String?> getStoredName() async {
@@ -80,8 +82,11 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1565C0),
-      body: Center(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: SariGradients.primaryVertical,
+        ),
+        child: Center(
         child: AnimatedBuilder(
           animation: _controller,
           builder: (context, child) {
@@ -92,32 +97,15 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Container(
+                    const Image(
+                      image: AssetImage('assets/sarisync.png'),
                       width: 120,
                       height: 120,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.2),
-                            blurRadius: 20,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                      ),
-                      child: const ClipRRect(
-                        borderRadius: BorderRadius.all(Radius.circular(24)),
-                        child: Image(
-                          image: AssetImage('assets/sarisync.png'),
-                          fit: BoxFit.cover,
-                        ),
-                      ),
                     ),
                     const SizedBox(height: 24),
-                    const Text(
+                    Text(
                       'SariSync',
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         color: Colors.white,
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
@@ -127,7 +115,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     const SizedBox(height: 8),
                     Text(
                       'Point of Sale',
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         color: Colors.white.withValues(alpha: 0.8),
                         fontSize: 16,
                         fontWeight: FontWeight.w400,
@@ -150,6 +138,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
             );
           },
         ),
+      ),
       ),
     );
   }
@@ -189,95 +178,126 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1565C0),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: const Icon(
-                  Icons.storefront,
-                  size: 50,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 40),
-              const Text(
-                'Welcome to SariSync!',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1565C0),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'How should we call you?',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-              const SizedBox(height: 32),
-              TextField(
-                controller: _nameController,
-                textCapitalization: TextCapitalization.words,
-                decoration: InputDecoration(
-                  hintText: 'Enter your name',
-                  prefixIcon: const Icon(Icons.person, color: Color(0xFF1565C0)),
-                  errorText: _errorMessage,
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: Colors.grey.shade200),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: Colors.grey.shade200),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(color: Color(0xFF1565C0), width: 2),
-                  ),
-                ),
-                onChanged: (_) {
-                  if (_errorMessage != null) {
-                    setState(() {
-                      _errorMessage = null;
-                    });
-                  }
-                },
-                onSubmitted: (_) => _saveName(),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _saveName,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1565C0),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [SariColors.backgroundLight, Color(0xFFE8F0FE)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      gradient: SariGradients.primary,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: SariColors.primaryGreen.withValues(alpha: 0.3),
+                          blurRadius: 15,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.storefront,
+                      size: 50,
+                      color: Colors.white,
                     ),
                   ),
-                  child: const Text(
-                    'Continue',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  const SizedBox(height: 40),
+                  const Text(
+                    'Welcome to SariSync!',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1565C0),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'How should we call you?',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  TextField(
+                    controller: _nameController,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: InputDecoration(
+                      hintText: 'Enter your name',
+                      prefixIcon: const Icon(Icons.person, color: Color(0xFF1565C0)),
+                      errorText: _errorMessage,
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: Colors.grey.shade200),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: Colors.grey.shade200),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: Color(0xFF1565C0), width: 2),
+                      ),
+                    ),
+                    onChanged: (_) {
+                      if (_errorMessage != null) {
+                        setState(() {
+                          _errorMessage = null;
+                        });
+                      }
+                    },
+                    onSubmitted: (_) => _saveName(),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: SariGradients.primaryHorizontal,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: SariColors.primaryGreen.withValues(alpha: 0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: ElevatedButton(
+                        onPressed: _saveName,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          foregroundColor: Colors.white,
+                          shadowColor: Colors.transparent,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: const Text(
+                          'Continue',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -306,6 +326,9 @@ class SarisyncApp extends StatelessWidget {
         ),
         BlocProvider<AuditCubit>(
           create: (_) => AuditCubit(db),
+        ),
+        BlocProvider<ExpenseCubit>(
+          create: (_) => ExpenseCubit(db),
         ),
       ],
       child: MaterialApp(
@@ -367,6 +390,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     POSDashboardScreen(),
     InventoryScreen(),
     DebtLedgerScreen(),
+    ExpenseScreen(),
     AuditReportScreen(),
   ];
 
@@ -377,37 +401,53 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         index: _selectedIndex,
         children: _screens,
       ),
-      bottomNavigationBar: NavigationBar(
-        backgroundColor: SariColors.backgroundWhite,
-        indicatorColor: SariColors.primaryGreen.withValues(alpha: 0.15),
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.point_of_sale_outlined),
-            selectedIcon: Icon(Icons.point_of_sale),
-            label: 'POS',
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [SariColors.backgroundWhite, Color(0xFFF0F4FF)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            stops: [0.0, 0.3],
           ),
-          NavigationDestination(
-            icon: Icon(Icons.inventory_2_outlined),
-            selectedIcon: Icon(Icons.inventory_2),
-            label: 'Inventory',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.account_balance_wallet_outlined),
-            selectedIcon: Icon(Icons.account_balance_wallet),
-            label: 'Debts',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.analytics_outlined),
-            selectedIcon: Icon(Icons.analytics),
-            label: 'Sales',
-          ),
-        ],
+        ),
+        child: NavigationBar(
+          backgroundColor: Colors.transparent,
+          indicatorColor: SariColors.primaryGreen.withValues(alpha: 0.2),
+          surfaceTintColor: Colors.transparent,
+          selectedIndex: _selectedIndex,
+          onDestinationSelected: (index) {
+            setState(() {
+              _selectedIndex = index;
+            });
+          },
+          destinations: [
+            const NavigationDestination(
+              icon: Icon(Icons.point_of_sale_outlined),
+              selectedIcon: Icon(Icons.point_of_sale),
+              label: 'POS',
+            ),
+            const NavigationDestination(
+              icon: Icon(Icons.inventory_2_outlined),
+              selectedIcon: Icon(Icons.inventory_2),
+              label: 'Inventory',
+            ),
+            const NavigationDestination(
+              icon: Icon(Icons.account_balance_wallet_outlined),
+              selectedIcon: Icon(Icons.account_balance_wallet),
+              label: 'Debts',
+            ),
+            const NavigationDestination(
+              icon: Icon(Icons.money_off_outlined),
+              selectedIcon: Icon(Icons.money_off),
+              label: 'Expenses',
+            ),
+            const NavigationDestination(
+              icon: Icon(Icons.analytics_outlined),
+              selectedIcon: Icon(Icons.analytics),
+              label: 'Audit',
+            ),
+          ],
+        ),
       ),
     );
   }

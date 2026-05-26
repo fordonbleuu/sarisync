@@ -27,17 +27,18 @@ class StockAwareQuantitySpinner extends StatelessWidget {
           color: canDecrement ? Colors.red : Colors.grey.shade300,
           onPressed: canDecrement ? () => onChanged(quantity - 1) : null,
         ),
-        Container(
-          constraints: const BoxConstraints(minWidth: 40),
-          alignment: Alignment.center,
-          child: Text(
-            '$quantity',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: quantity > 0
-                  ? Theme.of(context).colorScheme.primary
-                  : Colors.grey,
+        SizedBox(
+          width: 40,
+          child: Center(
+            child: Text(
+              '$quantity',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: quantity > 0
+                    ? Theme.of(context).colorScheme.primary
+                    : Colors.grey,
+              ),
             ),
           ),
         ),

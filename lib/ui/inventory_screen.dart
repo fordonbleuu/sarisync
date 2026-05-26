@@ -63,55 +63,36 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final totalProducts = _products.length;
     final totalStock = _products.fold<int>(0, (sum, p) => sum + p.stockQuantity);
     final outOfStock = _products.where((p) => p.stockQuantity == 0).length;
-    final totalValue = _products.fold<double>(0, (sum, p) => sum + (p.costPrice * p.stockQuantity));
 
-    return SizedBox(
-      height: 130,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 12,
         children: [
-          SizedBox(
-            width: 160,
-            child: SariStatCard(
-              title: 'Total Products',
-              value: '$totalProducts',
-              icon: Icons.inventory_2,
-              iconColor: SariColors.primaryGreen,
-            ),
-          ),
-          const SizedBox(width: 12),
-          SizedBox(
-            width: 160,
-            child: SariStatCard(
-              title: 'Total Stock',
-              value: '$totalStock',
-              icon: Icons.widgets,
-              iconColor: SariColors.secondaryNavy,
-            ),
-          ),
-          const SizedBox(width: 12),
-          SizedBox(
-            width: 160,
-            child: SariStatCard(
-              title: 'Out of Stock',
-              value: '$outOfStock',
-              icon: Icons.remove_shopping_cart,
-              iconColor: SariColors.error,
-            ),
-          ),
-          const SizedBox(width: 12),
-          SizedBox(
-            width: 160,
-            child: SariStatCard(
-              title: 'Inventory Value',
-              value: '₱${totalValue.toStringAsFixed(0)}',
-              icon: Icons.attach_money,
-              iconColor: SariColors.success,
-            ),
-          ),
+          _buildStatItem('Total Products', '$totalProducts', Icons.inventory_2, SariColors.primaryGreen),
+          _buildStatItem('Total Stock', '$totalStock', Icons.widgets, SariColors.secondaryNavy),
+          _buildStatItem('Out of Stock', '$outOfStock', Icons.remove_shopping_cart, SariColors.error),
         ],
       ),
+    );
+  }
+
+  Widget _buildStatItem(String title, String value, IconData icon, Color color) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = (constraints.maxWidth - 24) / 2; // Default to 2 columns
+        return SizedBox(
+          width: constraints.maxWidth > 500 ? (constraints.maxWidth - 24) / 3 : width,
+          child: SariStatCard(
+            title: title,
+            value: value,
+            icon: icon,
+            iconColor: color,
+            useGradient: true,
+          ),
+        );
+      },
     );
   }
 
@@ -121,8 +102,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
       appBar: AppBar(
         title: const Text('Inventory'),
         centerTitle: true,
-        backgroundColor: SariColors.backgroundWhite,
+        backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: SariGradients.appBar,
+          ),
+        ),
         actions: [
           Container(
             margin: const EdgeInsets.only(right: 8),
@@ -144,6 +131,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
+                const SizedBox(height: 8),
                 _buildStatsRow(),
                 Padding(
                   padding: const EdgeInsets.all(16.0),
@@ -170,6 +158,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: DropdownButtonFormField<String>(
+                          isExpanded: true,
                           initialValue: _selectedCategory,
                           decoration: InputDecoration(
                             border: OutlineInputBorder(
@@ -197,22 +186,42 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 Expanded(
                   child: _filteredProducts.isEmpty
                       ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey.shade400),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No products found',
-                                style: TextStyle(color: Colors.grey.shade600),
-                              ),
-                              const SizedBox(height: 8),
-                              ElevatedButton.icon(
-                                onPressed: () => _showProductFormSheet(context),
-                                icon: const Icon(Icons.add),
-                                label: const Text('Add Product'),
-                              ),
-                            ],
+                          child: SingleChildScrollView(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey.shade400),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No products found',
+                                  style: TextStyle(color: Colors.grey.shade600),
+                                ),
+                                const SizedBox(height: 16),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    gradient: SariGradients.buttonPrimary,
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: SariColors.primaryGreen.withValues(alpha: 0.3),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: ElevatedButton.icon(
+                                    onPressed: () => _showProductFormSheet(context),
+                                    icon: const Icon(Icons.add),
+                                    label: const Text('Add Product'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.transparent,
+                                      foregroundColor: Colors.white,
+                                      shadowColor: Colors.transparent,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         )
                       : ListView.builder(
@@ -231,12 +240,24 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   Widget _buildProductListItem(Product product) {
     final isLowStock = product.stockQuantity <= product.minStockAlert;
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
+      decoration: BoxDecoration(
+        gradient: SariGradients.surfaceLight,
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: isLowStock ? Colors.red.shade300 : Colors.grey.shade200, width: 1),
+        border: Border.all(
+          color: isLowStock
+              ? (product.stockQuantity == 0 ? Colors.red.shade300 : Colors.orange.shade300)
+              : SariColors.divider,
+          width: isLowStock ? 1.5 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -245,17 +266,23 @@ class _InventoryScreenState extends State<InventoryScreen> {
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: SizedBox(
-                width: 70,
-                height: 70,
+                width: 60,
+                height: 60,
                 child: product.imagePath != null && File(product.imagePath!).existsSync()
                     ? Image.file(File(product.imagePath!), fit: BoxFit.cover)
                     : Container(
-                        color: SariColors.backgroundLight,
-                        child: Icon(Icons.inventory_2, color: Colors.grey.shade400),
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [SariColors.backgroundLight, Color(0xFFE8F0FE)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                        ),
+                        child: Icon(Icons.inventory_2, color: Colors.grey.shade400, size: 24),
                       ),
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -267,28 +294,27 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           product.name,
                           style: const TextStyle(
                             fontWeight: FontWeight.w600,
-                            fontSize: 16,
+                            fontSize: 15,
                           ),
-                          maxLines: 1,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      const SizedBox(width: 4),
                       if (isLowStock)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: product.stockQuantity == 0 
-                                ? Colors.red.shade100 
-                                : Colors.orange.shade100,
-                            borderRadius: BorderRadius.circular(8),
+                            gradient: product.stockQuantity == 0
+                                ? SariGradients.error
+                                : SariGradients.buttonWarning,
+                            borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             product.stockQuantity == 0 ? 'OUT' : 'LOW',
-                            style: TextStyle(
-                              color: product.stockQuantity == 0 
-                                  ? Colors.red.shade700 
-                                  : Colors.orange.shade700,
-                              fontSize: 11,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -300,17 +326,17 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     product.category,
                     style: TextStyle(
                       color: Colors.grey.shade600,
-                      fontSize: 13,
+                      fontSize: 12,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Wrap(
                     spacing: 6,
                     runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      _buildPriceTag('Cost', product.costPrice),
                       _buildPriceTag('Sell', product.sellingPrice, isPrimary: true),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -319,11 +345,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          '${product.stockQuantity}',
+                          'Stock: ${product.stockQuantity}',
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             color: SariColors.primaryGreen,
-                            fontSize: 12,
+                            fontSize: 11,
                           ),
                         ),
                       ),
@@ -333,6 +359,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
               ),
             ),
             PopupMenuButton(
+              padding: EdgeInsets.zero,
               itemBuilder: (context) => [
                 const PopupMenuItem(
                   value: 'edit',
@@ -373,7 +400,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: isPrimary ? Theme.of(context).colorScheme.primaryContainer : Colors.grey.shade200,
+        gradient: isPrimary
+            ? LinearGradient(
+                colors: [
+                  SariColors.primaryGreen.withValues(alpha: 0.1),
+                  SariColors.primaryGreenDark.withValues(alpha: 0.15),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : SariGradients.cardSubtle,
         borderRadius: BorderRadius.circular(4),
       ),
       child: FittedBox(
@@ -383,7 +419,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           style: TextStyle(
             fontSize: 11,
             fontWeight: isPrimary ? FontWeight.bold : FontWeight.normal,
-            color: isPrimary ? Theme.of(context).colorScheme.onPrimaryContainer : Colors.grey.shade700,
+            color: isPrimary ? SariColors.primaryGreen : Colors.grey.shade700,
           ),
           overflow: TextOverflow.ellipsis,
         ),
@@ -402,13 +438,23 @@ class _InventoryScreenState extends State<InventoryScreen> {
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
-            onPressed: () {
-              context.read<InventoryBloc>().add(DeleteProduct(product));
-              Navigator.pop(ctx);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Delete'),
+          Container(
+            decoration: BoxDecoration(
+              gradient: SariGradients.buttonError,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: ElevatedButton(
+              onPressed: () {
+                context.read<InventoryBloc>().add(DeleteProduct(product));
+                Navigator.pop(ctx);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                foregroundColor: Colors.white,
+                shadowColor: Colors.transparent,
+              ),
+              child: const Text('Delete'),
+            ),
           ),
         ],
       ),
@@ -420,9 +466,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final nameController = TextEditingController(text: product?.name ?? '');
     final barcodeController = TextEditingController(text: product?.barCode ?? '');
     final categoryController = TextEditingController(text: product?.category ?? '');
-    final costPriceController = TextEditingController(text: product?.costPrice.toString() ?? '');
     final sellingPriceController = TextEditingController(text: product?.sellingPrice.toString() ?? '');
-    final stockController = TextEditingController(text: product?.stockQuantity.toString() ?? '0');
+    final stockController = TextEditingController(text: !isEditing ? (product?.stockQuantity.toString() ?? '0') : '');
+    final addStockController = isEditing ? TextEditingController() : null;
     final minStockController = TextEditingController(text: product?.minStockAlert.toString() ?? '5');
     String? imagePath = product?.imagePath;
 
@@ -546,112 +592,161 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: costPriceController,
-                          decoration: const InputDecoration(
-                            labelText: 'Cost Price *',
-                            prefixIcon: Icon(Icons.attach_money),
-                            border: OutlineInputBorder(),
-                          ),
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: TextField(
-                          controller: sellingPriceController,
-                          decoration: const InputDecoration(
-                            labelText: 'Selling Price *',
-                            prefixIcon: Icon(Icons.sell),
-                            border: OutlineInputBorder(),
-                          ),
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        ),
-                      ),
-                    ],
+                  TextField(
+                    controller: sellingPriceController,
+                    decoration: const InputDecoration(
+                      labelText: 'Selling Price *',
+                      prefixIcon: Icon(Icons.sell),
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   ),
                   const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: stockController,
-                          decoration: const InputDecoration(
-                            labelText: 'Stock Quantity *',
-                            prefixIcon: Icon(Icons.inventory),
-                            border: OutlineInputBorder(),
-                          ),
-                          keyboardType: TextInputType.number,
-                        ),
+                  if (isEditing) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade300),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: TextField(
-                          controller: minStockController,
-                          decoration: const InputDecoration(
-                            labelText: 'Min Stock Alert',
-                            prefixIcon: Icon(Icons.warning),
-                            border: OutlineInputBorder(),
+                      child: Row(
+                        children: [
+                          const                           Icon(Icons.inventory, color: Colors.grey),
+                          const SizedBox(width: 12),
+                          Flexible(
+                            child: Text(
+                              'Current Stock: ',
+                              style: TextStyle(color: Colors.grey.shade700),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                          keyboardType: TextInputType.number,
-                        ),
+                          Text(
+                            '${product.stockQuantity}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: addStockController,
+                      decoration: const InputDecoration(
+                        labelText: 'Stock to Add',
+                        prefixIcon: Icon(Icons.add_box),
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ] else ...[
+                    TextField(
+                      controller: stockController,
+                      decoration: const InputDecoration(
+                        labelText: 'Stock Quantity *',
+                        prefixIcon: Icon(Icons.inventory),
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: minStockController,
+                    decoration: const InputDecoration(
+                      labelText: 'Min Stock Alert',
+                      prefixIcon: Icon(Icons.warning),
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.number,
                   ),
                   const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      final name = nameController.text.trim();
-                      final category = categoryController.text.trim();
-                      final costPrice = double.tryParse(costPriceController.text);
-                      final sellingPrice = double.tryParse(sellingPriceController.text);
-                      final stock = int.tryParse(stockController.text);
-                      final minStock = int.tryParse(minStockController.text) ?? 5;
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: SariGradients.buttonPrimary,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: SariColors.primaryGreen.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        final name = nameController.text.trim();
+                        final category = categoryController.text.trim();
+                        final sellingPrice = double.tryParse(sellingPriceController.text);
+                        final stock = int.tryParse(stockController.text);
+                        final addStock = int.tryParse(addStockController?.text ?? '');
+                        final minStock = int.tryParse(minStockController.text) ?? 5;
 
-                      if (name.isEmpty || category.isEmpty || costPrice == null || sellingPrice == null || stock == null) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Please fill all required fields'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                        return;
-                      }
+                        if (name.isEmpty || category.isEmpty || sellingPrice == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Please fill all required fields'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
 
-                      if (isEditing) {
-                        final updatedProduct = Product(
-                          id: product.id,
-                          name: name,
-                          barCode: barcodeController.text.trim().isNotEmpty ? barcodeController.text.trim() : null,
-                          category: category,
-                          costPrice: costPrice,
-                          sellingPrice: sellingPrice,
-                          stockQuantity: stock,
-                          minStockAlert: minStock,
-                          imagePath: imagePath,
-                        );
-                        context.read<InventoryBloc>().add(UpdateProduct(updatedProduct));
-                      } else {
-                        context.read<InventoryBloc>().add(AddProduct(
-                              name: name,
-                              category: category,
-                              costPrice: costPrice,
-                              sellingPrice: sellingPrice,
-                              stockQuantity: stock,
-                              minStockAlert: minStock,
-                              barCode: barcodeController.text.trim().isNotEmpty ? barcodeController.text.trim() : null,
-                              imagePath: imagePath,
-                            ));
-                      }
-                      Navigator.pop(context);
-                    },
-                    icon: Icon(isEditing ? Icons.save : Icons.add),
-                    label: Text(isEditing ? 'Save Changes' : 'Add Product'),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                        if (isEditing) {
+                          if (addStock == null || addStock <= 0) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Please enter a valid stock amount to add'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
+                          final updatedProduct = Product(
+                            id: product.id,
+                            name: name,
+                            barCode: barcodeController.text.trim().isNotEmpty ? barcodeController.text.trim() : null,
+                            category: category,
+                            costPrice: product.costPrice,
+                            sellingPrice: sellingPrice,
+                            stockQuantity: product.stockQuantity + addStock,
+                            minStockAlert: minStock,
+                            imagePath: imagePath,
+                          );
+                          context.read<InventoryBloc>().add(UpdateProduct(updatedProduct));
+                        } else {
+                          if (stock == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Please fill all required fields'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
+                          context.read<InventoryBloc>().add(AddProduct(
+                                name: name,
+                                category: category,
+                                costPrice: 0,
+                                sellingPrice: sellingPrice,
+                                stockQuantity: stock,
+                                minStockAlert: minStock,
+                                barCode: barcodeController.text.trim().isNotEmpty ? barcodeController.text.trim() : null,
+                                imagePath: imagePath,
+                              ));
+                        }
+                        Navigator.pop(context);
+                      },
+                      icon: Icon(isEditing ? Icons.save : Icons.add),
+                      label: Text(isEditing ? 'Save Changes' : 'Add Product'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        foregroundColor: Colors.white,
+                        shadowColor: Colors.transparent,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
                     ),
                   ),
                 ],

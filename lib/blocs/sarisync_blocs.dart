@@ -118,26 +118,34 @@ class CartCubit extends Cubit<CartState> {
 
   void removeFromCart(String productId) {
     final currentState = state;
-    if (currentState is CartLoaded) {
-      final items = currentState.items.where((item) => item.product.id != productId).toList();
-      emit(CartLoaded(items: items, discount: currentState.discount));
-    }
+    final CartLoaded loadedState = currentState is CartLoaded ? currentState : const CartLoaded(items: []);
+    
+    final items = loadedState.items.where((item) => item.product.id != productId).toList();
+    emit(CartLoaded(items: items, discount: loadedState.discount));
   }
 
-  void updateQuantity(String productId, int quantity) {
+  void updateQuantity(String productId, int quantity, {Product? product}) {
     final currentState = state;
-    if (currentState is CartLoaded) {
-      if (quantity <= 0) {
-        removeFromCart(productId);
-        return;
-      }
-      final items = currentState.items.map((item) {
+    final CartLoaded loadedState = currentState is CartLoaded ? currentState : const CartLoaded(items: []);
+    
+    if (quantity <= 0) {
+      removeFromCart(productId);
+      return;
+    }
+    
+    final existingIndex = loadedState.items.indexWhere((item) => item.product.id == productId);
+    if (existingIndex >= 0) {
+      final items = loadedState.items.map((item) {
         if (item.product.id == productId) {
           return item.copyWith(quantity: quantity);
         }
         return item;
       }).toList();
-      emit(CartLoaded(items: items, discount: currentState.discount));
+      emit(CartLoaded(items: items, discount: loadedState.discount));
+    } else if (product != null) {
+      final items = List<CartItem>.from(loadedState.items);
+      items.add(CartItem(product: product, quantity: quantity));
+      emit(CartLoaded(items: items, discount: loadedState.discount));
     }
   }
 
@@ -221,13 +229,33 @@ class DebtCubit extends Cubit<DebtState> {
     return super.close();
   }
 
+  void refreshDebts() {
+    _db.loadAllDebts();
+  }
+
   void _loadDebts() {
     _debtSubscription?.cancel();
-    _debtSubscription = _db.watchActiveCreditLines().listen((debts) {
+    _debtSubscription = _db.watchAllDebts().listen((debts) {
       if (!isClosed) {
-        emit(DebtLoaded(debts));
+        if (state is DebtLoaded) {
+          emit((state as DebtLoaded).copyWith(debts: debts));
+        } else {
+          emit(DebtLoaded(debts: debts));
+        }
       }
     });
+  }
+
+  void setSearchQuery(String query) {
+    if (state is DebtLoaded) {
+      emit((state as DebtLoaded).copyWith(searchQuery: query));
+    }
+  }
+
+  void toggleShowOnlyActive(bool showOnlyActive) {
+    if (state is DebtLoaded) {
+      emit((state as DebtLoaded).copyWith(showOnlyActive: showOnlyActive));
+    }
   }
 
   Future<void> receivePayment(String debtId, double amount) async {
@@ -236,6 +264,28 @@ class DebtCubit extends Cubit<DebtState> {
     } catch (e) {
       emit(DebtError(e.toString()));
     }
+  }
+
+  Future<void> createManualDebt({
+    required String customerName,
+    String? customerContact,
+    required double amount,
+    DateTime? dueDate,
+  }) async {
+    try {
+      await _db.addManualDebt(
+        customerName: customerName,
+        customerContact: customerContact,
+        amount: amount,
+        dueDate: dueDate,
+      );
+    } catch (e) {
+      emit(DebtError(e.toString()));
+    }
+  }
+
+  Future<List<CashFlowLog>> getPaymentHistory(String debtId) async {
+    return await _db.getDebtPayments(debtId);
   }
 }
 
@@ -266,6 +316,46 @@ class AuditCubit extends Cubit<AuditState> {
       await loadAudit(_selectedDate);
     } catch (e) {
       emit(AuditError(e.toString()));
+    }
+  }
+}
+
+class ExpenseCubit extends Cubit<ExpenseState> {
+  final AppDatabase _db;
+
+  ExpenseCubit(this._db) : super(ExpenseInitial()) {
+    loadExpenses();
+  }
+
+  Future<void> loadExpenses() async {
+    emit(ExpenseLoading());
+    try {
+      final db = await _db.database;
+      final maps = await db.query(
+        'cash_flow_logs',
+        where: 'type = ?',
+        whereArgs: ['OUT'],
+        orderBy: 'timestamp DESC',
+      );
+      final expenses = maps.map((m) => CashFlowLog(
+        id: m['id'] as String,
+        timestamp: DateTime.parse(m['timestamp'] as String),
+        type: m['type'] as String,
+        amount: (m['amount'] as num).toDouble(),
+        description: m['description'] as String,
+      )).toList();
+      emit(ExpenseLoaded(expenses));
+    } catch (e) {
+      emit(ExpenseError(e.toString()));
+    }
+  }
+
+  Future<void> addExpense(String description, double amount) async {
+    try {
+      await _db.addExpense(description: description, amount: amount);
+      loadExpenses();
+    } catch (e) {
+      emit(ExpenseError(e.toString()));
     }
   }
 }

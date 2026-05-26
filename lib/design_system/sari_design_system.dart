@@ -36,6 +36,147 @@ class SariColors {
   static const Color border = Color(0xFFCBD5E1);
 }
 
+class SariGradients {
+  static const LinearGradient primary = LinearGradient(
+    colors: [SariColors.primaryGreen, SariColors.primaryGreenDark],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const LinearGradient primaryHorizontal = LinearGradient(
+    colors: [SariColors.primaryGreen, SariColors.primaryGreenDark],
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+  );
+
+  static const LinearGradient primaryVertical = LinearGradient(
+    colors: [SariColors.primaryGreen, SariColors.primaryGreenDark],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+  );
+
+  static LinearGradient primaryWithOpacity(double opacity) {
+    return LinearGradient(
+      colors: [
+        SariColors.primaryGreen.withValues(alpha: opacity),
+        SariColors.primaryGreenDark.withValues(alpha: opacity),
+      ],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    );
+  }
+
+  static const LinearGradient accentGold = LinearGradient(
+    colors: [SariColors.accentAmber, SariColors.accentAmberLight],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const LinearGradient success = LinearGradient(
+    colors: [SariColors.success, Color(0xFF059669)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const LinearGradient error = LinearGradient(
+    colors: [SariColors.error, Color(0xFF991B1B)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static LinearGradient surfaceOverlay(Color baseColor, {double intensity = 0.03}) {
+    return LinearGradient(
+      colors: [
+        baseColor,
+        baseColor.withValues(alpha: 1.0 - intensity),
+        baseColor,
+      ],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      stops: const [0.0, 0.5, 1.0],
+    );
+  }
+
+  static BoxDecoration primaryCardDecoration({
+    double borderRadius = 16,
+    double blurRadius = 20,
+    double opacity = 0.3,
+  }) {
+    return BoxDecoration(
+      gradient: primary,
+      borderRadius: BorderRadius.circular(borderRadius),
+      boxShadow: [
+        BoxShadow(
+          color: SariColors.primaryGreen.withValues(alpha: opacity),
+          blurRadius: blurRadius,
+          offset: const Offset(0, 10),
+        ),
+      ],
+    );
+  }
+
+  static const LinearGradient appBar = LinearGradient(
+    colors: [SariColors.backgroundWhite, Color(0xFFF0F7FF)],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    stops: [0.0, 1.0],
+  );
+
+  static const LinearGradient appBarPrimary = LinearGradient(
+    colors: [SariColors.primaryGreen, SariColors.primaryGreenDark],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+  );
+
+  static const LinearGradient surfaceLight = LinearGradient(
+    colors: [SariColors.backgroundWhite, Color(0xFFF8FAFF)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const LinearGradient cardHover = LinearGradient(
+    colors: [SariColors.backgroundWhite, Color(0xFFF0F7FF)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const LinearGradient cardSubtle = LinearGradient(
+    colors: [Color(0xFFF8FAFC), Color(0xFFF0F7FF)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const LinearGradient surfaceSubtle = LinearGradient(
+    colors: [Color(0xFFF1F5F9), Color(0xFFE2E8F0)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const LinearGradient buttonPrimary = LinearGradient(
+    colors: [Color(0xFF1976D2), Color(0xFF0D47A1)],
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+  );
+
+  static const LinearGradient buttonSuccess = LinearGradient(
+    colors: [Color(0xFF10B981), Color(0xFF059669)],
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+  );
+
+  static const LinearGradient buttonWarning = LinearGradient(
+    colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+  );
+
+  static const LinearGradient buttonError = LinearGradient(
+    colors: [Color(0xFFDC2626), Color(0xFF991B1B)],
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+  );
+}
+
 class SariTheme {
   static ThemeData get lightTheme {
     return ThemeData(
@@ -164,8 +305,8 @@ class SariTheme {
   static AppBarTheme _buildAppBarTheme() {
     return AppBarTheme(
       elevation: 0,
-      scrolledUnderElevation: 1,
-      backgroundColor: SariColors.backgroundWhite,
+      scrolledUnderElevation: 0,
+      backgroundColor: Colors.transparent,
       foregroundColor: SariColors.primaryGreen,
       surfaceTintColor: Colors.transparent,
       centerTitle: true,
@@ -322,6 +463,8 @@ class SariStatCard extends StatelessWidget {
   final String? subtitle;
   final double? trendPercentage;
   final bool isPositiveTrend;
+  final bool useGradient;
+  final LinearGradient? gradient;
 
   const SariStatCard({
     super.key,
@@ -333,6 +476,8 @@ class SariStatCard extends StatelessWidget {
     this.subtitle,
     this.trendPercentage,
     this.isPositiveTrend = true,
+    this.useGradient = false,
+    this.gradient,
   });
 
   @override
@@ -340,11 +485,13 @@ class SariStatCard extends StatelessWidget {
     final theme = Theme.of(context);
     final cardColor = backgroundColor ?? SariColors.backgroundWhite;
     final accentColor = iconColor ?? SariColors.primaryGreen;
+    final effectiveGradient = gradient ?? SariGradients.cardHover;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: cardColor,
+        color: useGradient ? null : cardColor,
+        gradient: useGradient ? effectiveGradient : null,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: SariColors.divider),
         boxShadow: [
@@ -405,15 +552,20 @@ class SariStatCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          Text(
-            title,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: SariColors.textSecondary,
+          Flexible(
+            child: Text(
+              title,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: SariColors.textSecondary,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           const SizedBox(height: 4),
           FittedBox(
             fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
             child: Text(
               value,
               style: theme.textTheme.headlineMedium?.copyWith(
@@ -429,6 +581,8 @@ class SariStatCard extends StatelessWidget {
               style: theme.textTheme.bodySmall?.copyWith(
                 color: SariColors.textTertiary,
               ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ],
@@ -489,7 +643,7 @@ class SariProductTile extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: SariColors.backgroundWhite,
+        gradient: SariGradients.surfaceLight,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isLowStock
@@ -583,6 +737,8 @@ class SariProductTile extends StatelessWidget {
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: SariColors.textSecondary,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 8),
                       Row(
@@ -717,7 +873,7 @@ class SariTransactionTile extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: SariColors.backgroundWhite,
+        gradient: SariGradients.surfaceLight,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: SariColors.divider),
       ),
@@ -771,11 +927,14 @@ class SariTransactionTile extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(
-                      '${isPositive ? '+' : '-'}₱${amount.abs().toStringAsFixed(2)}',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: amountColor,
-                        fontWeight: FontWeight.w700,
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        '${isPositive ? '+' : '-'}₱${amount.abs().toStringAsFixed(2)}',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: amountColor,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -784,6 +943,8 @@ class SariTransactionTile extends StatelessWidget {
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: SariColors.textTertiary,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -805,6 +966,7 @@ class SariActionButton extends StatelessWidget {
   final bool isFullWidth;
   final Color? backgroundColor;
   final Color? foregroundColor;
+  final bool useGradient;
 
   const SariActionButton({
     super.key,
@@ -816,14 +978,27 @@ class SariActionButton extends StatelessWidget {
     this.isFullWidth = false,
     this.backgroundColor,
     this.foregroundColor,
+    this.useGradient = true,
   });
+
+  LinearGradient? get _effectiveGradient {
+    if (!isPrimary || !useGradient) return null;
+    if (backgroundColor != null) {
+      final bg = backgroundColor!;
+      final r = bg.r, g = bg.g, b = bg.b;
+      final darker = Color.from(alpha: bg.a, red: r * 0.6, green: g * 0.6, blue: b * 0.6);
+      return LinearGradient(
+        colors: [bg, darker],
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+      );
+    }
+    return SariGradients.buttonPrimary;
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final bgColor = isPrimary
-        ? (backgroundColor ?? SariColors.primaryGreen)
-        : Colors.transparent;
     final fgColor = isPrimary
         ? (foregroundColor ?? Colors.white)
         : (foregroundColor ?? SariColors.primaryGreen);
@@ -849,11 +1024,15 @@ class SariActionButton extends StatelessWidget {
           const SizedBox(width: 8),
         ],
         if (!isLoading)
-          Text(
-            label,
-            style: theme.textTheme.labelLarge?.copyWith(
-              color: fgColor,
-              fontWeight: FontWeight.w600,
+          Flexible(
+            child: Text(
+              label,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: fgColor,
+                fontWeight: FontWeight.w600,
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
             ),
           ),
       ],
@@ -862,18 +1041,32 @@ class SariActionButton extends StatelessWidget {
     if (isPrimary) {
       return SizedBox(
         width: isFullWidth ? double.infinity : null,
-        child: ElevatedButton(
-          onPressed: isLoading ? null : onPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: bgColor,
-            foregroundColor: fgColor,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-            minimumSize: const Size(48, 48),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: _effectiveGradient ?? SariGradients.buttonPrimary,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: SariColors.primaryGreen.withValues(alpha: 0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-          child: buttonContent,
+          child: ElevatedButton(
+            onPressed: isLoading ? null : onPressed,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              foregroundColor: fgColor,
+              shadowColor: Colors.transparent,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              minimumSize: const Size(48, 48),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: buttonContent,
+          ),
         ),
       );
     }

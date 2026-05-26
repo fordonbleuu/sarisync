@@ -1,17 +1,32 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:sarisync/main.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
-  testWidgets('App renders smoke test', (WidgetTester tester) async {
-    await tester.pumpWidget(const SarisyncApp(savedName: 'Test User'));
-    expect(find.text('SariSync POS'), findsOneWidget);
+  // Initialize sqflite for tests
+  sqfliteFfiInit();
+  databaseFactory = databaseFactoryFfi;
+
+  testWidgets('App renders splash screen', (WidgetTester tester) async {
+    // Build our app and trigger a frame.
+    await tester.pumpWidget(const MaterialApp(home: SplashScreen()));
+
+    // Verify that the splash screen text is present.
+    expect(find.text('SariSync'), findsOneWidget);
+    expect(find.text('Point of Sale'), findsOneWidget);
+
+    // Pump the timer so it doesn't stay pending
+    await tester.pump(const Duration(seconds: 3));
+  });
+
+  testWidgets('App shows welcome screen when no name is saved', (WidgetTester tester) async {
+    // We use a small delay to simulate the splash screen timer if needed, 
+    // but here we just test the WelcomeScreen directly for simplicity.
+    await tester.pumpWidget(const MaterialApp(home: WelcomeScreen()));
+
+    expect(find.text('Welcome to SariSync!'), findsOneWidget);
+    expect(find.text('How should we call you?'), findsOneWidget);
+    expect(find.byType(TextField), findsOneWidget);
   });
 }

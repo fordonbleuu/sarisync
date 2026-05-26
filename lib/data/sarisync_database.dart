@@ -127,8 +127,57 @@ class SalesItem {
   });
 }
 
+class Customer {
+  final String id;
+  final String name;
+  final String? contact;
+  final double totalDebt;
+  final DateTime createdAt;
+
+  Customer({
+    required this.id,
+    required this.name,
+    this.contact,
+    this.totalDebt = 0.0,
+    required this.createdAt,
+  });
+
+  Customer copyWith({
+    String? id,
+    String? name,
+    String? contact,
+    double? totalDebt,
+    DateTime? createdAt,
+  }) {
+    return Customer(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      contact: contact ?? this.contact,
+      totalDebt: totalDebt ?? this.totalDebt,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'name': name,
+    'contact': contact,
+    'totalDebt': totalDebt,
+    'createdAt': createdAt.toIso8601String(),
+  };
+
+  factory Customer.fromMap(Map<String, dynamic> map) => Customer(
+    id: map['id'] as String,
+    name: map['name'] as String,
+    contact: map['contact'] as String?,
+    totalDebt: (map['totalDebt'] as num?)?.toDouble() ?? 0.0,
+    createdAt: DateTime.parse(map['createdAt'] as String),
+  );
+}
+
 class Debt {
   final String id;
+  final String? customerId;
   final String customerName;
   final String? customerContact;
   final String? orderId;
@@ -139,6 +188,7 @@ class Debt {
 
   Debt({
     required this.id,
+    this.customerId,
     required this.customerName,
     this.customerContact,
     this.orderId,
@@ -148,8 +198,11 @@ class Debt {
     required this.status,
   });
 
+  double get remainingBalance => amountDue - amountPaid;
+
   Debt copyWith({
     String? id,
+    String? customerId,
     String? customerName,
     String? customerContact,
     String? orderId,
@@ -160,6 +213,7 @@ class Debt {
   }) {
     return Debt(
       id: id ?? this.id,
+      customerId: customerId ?? this.customerId,
       customerName: customerName ?? this.customerName,
       customerContact: customerContact ?? this.customerContact,
       orderId: orderId ?? this.orderId,
@@ -172,6 +226,7 @@ class Debt {
 
   Map<String, dynamic> toMap() => {
     'id': id,
+    'customerId': customerId,
     'customerName': customerName,
     'customerContact': customerContact,
     'orderId': orderId,
@@ -183,10 +238,11 @@ class Debt {
 
   factory Debt.fromMap(Map<String, dynamic> map) => Debt(
     id: map['id'] as String,
+    customerId: map['customerId'] as String?,
     customerName: map['customerName'] as String,
     customerContact: map['customerContact'] as String?,
     orderId: map['orderId'] as String?,
-    amountDue: (map['amountDue'] as num).toDouble(),
+    amountDue: (map['amountDue'] as num?)?.toDouble() ?? 0.0,
     amountPaid: (map['amountPaid'] as num?)?.toDouble() ?? 0.0,
     dueDate: map['dueDate'] != null ? DateTime.parse(map['dueDate'] as String) : null,
     status: map['status'] as String,
@@ -227,13 +283,17 @@ class DailyFinancialSummary {
   final double grossRevenue;
   final double cogs;
   final double expenses;
+  final double debtCollections;
   final double netMargin;
+  final double totalOutstandingDebt;
 
   DailyFinancialSummary({
     required this.grossRevenue,
     required this.cogs,
     required this.expenses,
+    required this.debtCollections,
     required this.netMargin,
+    required this.totalOutstandingDebt,
   });
 }
 
@@ -259,7 +319,7 @@ class AppDatabase {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE products (
@@ -272,6 +332,16 @@ class AppDatabase {
             stockQuantity INTEGER NOT NULL,
             minStockAlert INTEGER DEFAULT 5,
             imagePath TEXT
+          )
+        ''');
+
+        await db.execute('''
+          CREATE TABLE customers (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            contact TEXT,
+            totalDebt REAL DEFAULT 0.0,
+            createdAt TEXT NOT NULL
           )
         ''');
 
@@ -302,13 +372,15 @@ class AppDatabase {
         await db.execute('''
           CREATE TABLE debts (
             id TEXT PRIMARY KEY,
+            customerId TEXT,
             customerName TEXT NOT NULL,
             customerContact TEXT,
             orderId TEXT,
             amountDue REAL NOT NULL,
             amountPaid REAL DEFAULT 0.0,
             dueDate TEXT,
-            status TEXT NOT NULL
+            status TEXT NOT NULL,
+            FOREIGN KEY (customerId) REFERENCES customers(id)
           )
         ''');
 
@@ -321,6 +393,22 @@ class AppDatabase {
             description TEXT NOT NULL
           )
         ''');
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS customers (
+              id TEXT PRIMARY KEY,
+              name TEXT NOT NULL,
+              contact TEXT,
+              totalDebt REAL DEFAULT 0.0,
+              createdAt TEXT NOT NULL
+            )
+          ''');
+          try {
+            await db.execute('ALTER TABLE debts ADD COLUMN customerId TEXT');
+          } catch (_) {}
+        }
       },
     );
   }
@@ -362,6 +450,32 @@ class AppDatabase {
       whereArgs: [product.id],
     );
     await _loadProducts();
+  }
+
+  Future<Customer?> findCustomerByName(String name) async {
+    final db = await database;
+    final maps = await db.query(
+      'customers',
+      where: 'LOWER(name) = LOWER(?)',
+      whereArgs: [name],
+    );
+    if (maps.isEmpty) return null;
+    return Customer.fromMap(maps.first);
+  }
+
+  Future<Customer> findOrCreateCustomer(String name, {String? contact}) async {
+    final existing = await findCustomerByName(name);
+    if (existing != null) return existing;
+    final uuid = const Uuid();
+    final customer = Customer(
+      id: uuid.v4(),
+      name: name,
+      contact: contact,
+      createdAt: DateTime.now(),
+    );
+    final db = await database;
+    await db.insert('customers', customer.toMap());
+    return customer;
   }
 
   Future<void> checkoutCart({
@@ -423,8 +537,31 @@ class AppDatabase {
       }
 
       if (paymentMethod == 'Utang' && customerName != null) {
+        String? customerId;
+        try {
+          final existingMaps = await txn.query(
+            'customers',
+            where: 'LOWER(name) = LOWER(?)',
+            whereArgs: [customerName],
+          );
+          if (existingMaps.isNotEmpty) {
+            customerId = existingMaps.first['id'] as String;
+          } else {
+            final newId = uuid.v4();
+            await txn.insert('customers', {
+              'id': newId,
+              'name': customerName,
+              'contact': customerContact,
+              'totalDebt': 0.0,
+              'createdAt': DateTime.now().toIso8601String(),
+            });
+            customerId = newId;
+          }
+        } catch (_) {}
+
         await txn.insert('debts', {
           'id': uuid.v4(),
+          'customerId': customerId,
           'customerName': customerName,
           'customerContact': customerContact,
           'orderId': orderId,
@@ -447,17 +584,13 @@ class AppDatabase {
     });
 
     await _loadProducts();
-    _loadActiveDebts();
+    await loadAllDebts();
   }
 
-  Future<void> _loadActiveDebts() async {
+  Future<void> loadAllDebts() async {
     try {
       final db = await database;
-      final maps = await db.query(
-        'debts',
-        where: 'status = ?',
-        whereArgs: ['Active'],
-      );
+      final maps = await db.query('debts');
       final debts = maps.map((m) => Debt.fromMap(m)).toList();
       _debtsController.add(debts);
     } catch (e) {
@@ -465,9 +598,26 @@ class AppDatabase {
     }
   }
 
-  Stream<List<Debt>> watchActiveCreditLines() {
-    _loadActiveDebts();
+  Stream<List<Debt>> watchAllDebts() {
+    loadAllDebts();
     return _debtsController.stream;
+  }
+
+  Future<List<CashFlowLog>> getDebtPayments(String debtId) async {
+    final db = await database;
+    final maps = await db.query(
+      'cash_flow_logs',
+      where: 'description LIKE ?',
+      whereArgs: ['%Debt Payment - $debtId'],
+      orderBy: 'timestamp DESC',
+    );
+    return maps.map((m) => CashFlowLog(
+      id: m['id'] as String,
+      timestamp: DateTime.parse(m['timestamp'] as String),
+      type: m['type'] as String,
+      amount: (m['amount'] as num).toDouble(),
+      description: m['description'] as String,
+    )).toList();
   }
 
   Future<void> receiveDebtPayment(String debtId, double collectedAmount) async {
@@ -506,7 +656,32 @@ class AppDatabase {
       });
     });
 
-    _loadActiveDebts();
+    await loadAllDebts();
+  }
+
+  Future<void> addManualDebt({
+    required String customerName,
+    String? customerContact,
+    required double amount,
+    DateTime? dueDate,
+  }) async {
+    final db = await database;
+    final uuid = const Uuid();
+
+    final customer = await findOrCreateCustomer(customerName, contact: customerContact);
+
+    await db.insert('debts', {
+      'id': uuid.v4(),
+      'customerId': customer.id,
+      'customerName': customerName,
+      'customerContact': customerContact,
+      'amountDue': amount,
+      'amountPaid': 0.0,
+      'dueDate': dueDate?.toIso8601String(),
+      'status': 'Active',
+    });
+
+    await loadAllDebts();
   }
 
   Future<DailyFinancialSummary> computeAuditedMetricsForDate(DateTime lookupDate) async {
@@ -521,18 +696,18 @@ class AppDatabase {
     );
 
     final orderIds = orders.map((o) => o['id'] as String).toList();
-    if (orderIds.isEmpty) {
-      return DailyFinancialSummary(grossRevenue: 0, cogs: 0, expenses: 0, netMargin: 0);
-    }
-
-    final placeholders = List.filled(orderIds.length, '?').join(',');
-    final items = await db.rawQuery(
-      'SELECT * FROM sales_items WHERE orderId IN ($placeholders)',
-      orderIds,
-    );
-
+    
     double grossRevenue = orders.fold(0.0, (sum, o) => sum + ((o['totalAmount'] as num).toDouble()));
-    double totalCogs = items.fold(0.0, (sum, i) => sum + ((i['unitCostAtSale'] as num).toDouble() * (i['quantity'] as int)));
+    
+    double totalCogs = 0;
+    if (orderIds.isNotEmpty) {
+      final placeholders = List.filled(orderIds.length, '?').join(',');
+      final items = await db.rawQuery(
+        'SELECT * FROM sales_items WHERE orderId IN ($placeholders)',
+        orderIds,
+      );
+      totalCogs = items.fold(0.0, (sum, i) => sum + ((i['unitCostAtSale'] as num).toDouble() * (i['quantity'] as int)));
+    }
 
     final expenses = await db.query(
       'cash_flow_logs',
@@ -541,11 +716,23 @@ class AppDatabase {
     );
     double totalExpenses = expenses.fold(0.0, (sum, e) => sum + ((e['amount'] as num).toDouble()));
 
+    final collections = await db.query(
+      'cash_flow_logs',
+      where: 'type = ? AND description LIKE ? AND timestamp >= ? AND timestamp < ?',
+      whereArgs: ['IN', '%Debt Payment - %', startOfDay, endOfDay],
+    );
+    double totalDebtCollections = collections.fold(0.0, (sum, c) => sum + ((c['amount'] as num).toDouble()));
+
+    final activeDebts = await db.query('debts', where: 'status = ?', whereArgs: ['Active']);
+    double totalOutstandingDebt = activeDebts.fold(0.0, (sum, d) => sum + ((d['amountDue'] as num).toDouble() - (d['amountPaid'] as num).toDouble()));
+
     return DailyFinancialSummary(
       grossRevenue: grossRevenue,
       cogs: totalCogs,
       expenses: totalExpenses,
+      debtCollections: totalDebtCollections,
       netMargin: grossRevenue - totalCogs - totalExpenses,
+      totalOutstandingDebt: totalOutstandingDebt,
     );
   }
 

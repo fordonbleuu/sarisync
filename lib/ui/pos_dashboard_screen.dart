@@ -5,6 +5,8 @@ import '../design_system/sari_design_system.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../blocs/sarisync_blocs.dart';
 import '../data/sarisync_database.dart';
+import 'checkout_screen.dart';
+import 'inventory_screen.dart';
 
 class POSDashboardScreen extends StatefulWidget {
   const POSDashboardScreen({super.key});
@@ -23,6 +25,7 @@ class _POSDashboardScreenState extends State<POSDashboardScreen> {
   void initState() {
     super.initState();
     _loadProducts();
+    context.read<AuditCubit>().loadAudit(DateTime.now());
   }
 
   Future<void> _loadProducts() async {
@@ -67,168 +70,313 @@ class _POSDashboardScreenState extends State<POSDashboardScreen> {
               ),
             ),
             const SizedBox(width: 10),
-            const Text('SariSync'),
+            const Flexible(
+              child: Text(
+                'SariSync Dashboard',
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            ),
           ],
         ),
         centerTitle: false,
-        backgroundColor: SariColors.backgroundWhite,
+        backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: SariGradients.appBar,
+          ),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                Expanded(child: _buildProductGrid()),
-                _buildCheckoutBar(),
-              ],
+          : RefreshIndicator(
+              onRefresh: () async {
+                context.read<AuditCubit>().loadAudit(DateTime.now());
+              },
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSummaryCards(),
+                    const SizedBox(height: 24),
+                    _buildQuickActions(),
+                    const SizedBox(height: 24),
+                    _buildLowStockAlerts(),
+                    const SizedBox(height: 80), // Space for checkout bar
+                  ],
+                ),
+              ),
             ),
+      bottomSheet: _buildCheckoutBar(),
     );
   }
 
-  Widget _buildProductGrid() {
+  Widget _buildSummaryCards() {
+    return BlocBuilder<AuditCubit, AuditState>(
+      builder: (context, state) {
+        if (state is AuditLoaded) {
+          final summary = state.summary;
+          return Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: SariStatCard(
+                      title: 'Today\'s Sales',
+                      value: '₱${summary.grossRevenue.toStringAsFixed(2)}',
+                      icon: Icons.point_of_sale,
+                      iconColor: SariColors.primaryGreen,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SariStatCard(
+                      title: 'Net Margin',
+                      value: '₱${summary.netMargin.toStringAsFixed(2)}',
+                      icon: Icons.trending_up,
+                      iconColor: SariColors.success,
+                      backgroundColor: SariColors.success.withValues(alpha: 0.1),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: SariStatCard(
+                      title: 'Debt Coll.',
+                      value: '₱${summary.debtCollections.toStringAsFixed(2)}',
+                      icon: Icons.payments,
+                      iconColor: SariColors.accentAmber,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SariStatCard(
+                      title: 'Expenses',
+                      value: '₱${summary.expenses.toStringAsFixed(2)}',
+                      icon: Icons.money_off,
+                      iconColor: SariColors.error,
+                      backgroundColor: SariColors.error.withValues(alpha: 0.1),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SariStatCard(
+                title: 'Total Outstanding',
+                value: '₱${summary.totalOutstandingDebt.toStringAsFixed(2)}',
+                icon: Icons.account_balance_wallet,
+                iconColor: SariColors.error,
+                backgroundColor: SariColors.error.withValues(alpha: 0.1),
+              ),
+            ],
+          );
+        }
+        return const Center(child: CircularProgressIndicator());
+      },
+    );
+  }
+
+  Widget _buildQuickActions() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Text(
-            'Products',
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
+        Text(
+          'Quick Actions',
+          style: Theme.of(context).textTheme.headlineSmall,
         ),
-        Expanded(
-          child: GridView.builder(
-            padding: const EdgeInsets.all(16),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 0.9,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: SariActionButton(
+                label: 'New Sale',
+                icon: Icons.add_shopping_cart,
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const CheckoutScreen()),
+                  );
+                },
+              ),
             ),
-            itemCount: _products.length,
-            itemBuilder: (context, index) {
-              final product = _products[index];
-              final isLowStock = product.stockQuantity <= product.minStockAlert;
-              return _buildProductCard(product, isLowStock);
-            },
-          ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: SariActionButton(
+                label: 'Record Expense',
+                icon: Icons.receipt_long,
+                isPrimary: false,
+                onPressed: () {
+                  _showAddExpenseDialog();
+                },
+              ),
+            ),
+          ],
         ),
       ],
     );
   }
 
-  Widget _buildProductCard(Product product, bool isLowStock) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: isLowStock ? Colors.red.shade300 : Colors.grey.shade200, width: 1),
+  void _showAddExpenseDialog() {
+    final descriptionController = TextEditingController();
+    final amountController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      child: InkWell(
-        onTap: () {
-          if (product.stockQuantity > 0) {
-            context.read<CartCubit>().addToCart(product);
-          }
-        },
-        borderRadius: BorderRadius.circular(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              flex: 3,
-              child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                child: product.imagePath != null && File(product.imagePath!).existsSync()
-                    ? Image.file(
-                        File(product.imagePath!),
-                        fit: BoxFit.cover,
-                      )
-                    : Container(
-                        color: const Color(0xFFF5F7FA),
-                        child: Icon(
-                          Icons.inventory_2,
-                          size: 48,
-                          color: Colors.grey.shade400,
-                        ),
-                      ),
+      builder: (sheetContext) {
+        return SingleChildScrollView(
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 24,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.receipt_long, color: SariColors.error),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Record Expense',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ],
               ),
-            ),
-            Expanded(
-              flex: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Center(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.center,
-                        child: Text(
-                          product.name,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                          maxLines: 2,
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1565C0).withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            '₱${product.sellingPrice.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              color: Color(0xFF1565C0),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: isLowStock 
-                                ? (product.stockQuantity == 0 ? Colors.red.shade100 : Colors.orange.shade100)
-                                : Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            '${product.stockQuantity}',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: isLowStock 
-                                  ? (product.stockQuantity == 0 ? Colors.red.shade700 : Colors.orange.shade700)
-                                  : Colors.grey.shade700,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+              const SizedBox(height: 24),
+              TextField(
+                controller: descriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'Description',
+                  hintText: 'e.g., Electricity bill, Rent, Snacks',
+                  prefixIcon: Icon(Icons.description),
                 ),
+                textCapitalization: TextCapitalization.sentences,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: amountController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Amount',
+                  prefixIcon: Icon(Icons.money),
+                  prefixText: '₱',
+                ),
+              ),
+              const SizedBox(height: 24),
+              SariActionButton(
+                label: 'Save Expense',
+                backgroundColor: SariColors.error,
+                onPressed: () async {
+                  final description = descriptionController.text.trim();
+                  final amount = double.tryParse(amountController.text);
+
+                  if (description.isEmpty || amount == null || amount <= 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Please enter a description and valid amount'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+
+                  await sheetContext.read<ExpenseCubit>().addExpense(description, amount);
+                  if (!sheetContext.mounted) return;
+                  sheetContext.read<AuditCubit>().loadAudit(DateTime.now());
+                  Navigator.pop(sheetContext);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLowStockAlerts() {
+    final lowStockProducts = _products.where((p) => p.stockQuantity <= p.minStockAlert).toList();
+    if (lowStockProducts.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Low Stock Alerts',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: SariColors.error),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: SariColors.error.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${lowStockProducts.length} items',
+                style: const TextStyle(color: SariColors.error, fontWeight: FontWeight.bold, fontSize: 12),
               ),
             ),
           ],
         ),
-      ),
+        const SizedBox(height: 12),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: lowStockProducts.length > 3 ? 3 : lowStockProducts.length,
+          itemBuilder: (context, index) {
+            final product = lowStockProducts[index];
+            return SariProductTile(
+              productName: product.name,
+              category: product.category,
+              sellingPrice: product.sellingPrice,
+              costPrice: product.costPrice,
+              stockQuantity: product.stockQuantity,
+              minStockAlert: product.minStockAlert,
+              imagePath: product.imagePath,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const InventoryScreen()),
+                );
+              },
+            );
+          },
+        ),
+        if (lowStockProducts.length > 3)
+          Center(
+            child: TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const InventoryScreen()),
+                );
+              },
+              child: const Text('View All Low Stock'),
+            ),
+          ),
+      ],
     );
   }
 
   Widget _buildCheckoutBar() {
     return BlocConsumer<CartCubit, CartState>(
       listener: (context, state) {
-        if (state is CartSuccess) {
+        if (state is CartCheckoutSuccess) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(state.message),
@@ -236,6 +384,8 @@ class _POSDashboardScreenState extends State<POSDashboardScreen> {
             ),
           );
           _discountController.clear();
+          context.read<AuditCubit>().loadAudit(DateTime.now());
+          context.read<DebtCubit>().refreshDebts(); // Add this
         } else if (state is CartError) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -246,8 +396,10 @@ class _POSDashboardScreenState extends State<POSDashboardScreen> {
         }
       },
       builder: (context, state) {
-        final items = state is CartLoaded ? state.items : <CartItem>[];
-        final discount = state is CartLoaded ? state.discount : 0.0;
+        final items = state is CartLoaded ? state.items : (state is CartCheckoutSuccess ? state.items : <CartItem>[]);
+        if (items.isEmpty) return const SizedBox.shrink();
+
+        final discount = state is CartLoaded ? state.discount : (state is CartCheckoutSuccess ? state.discount : 0.0);
         final subtotal = items.fold(0.0, (sum, item) => sum + item.total);
         final total = subtotal - discount;
         final itemCount = items.fold(0, (sum, item) => sum + item.quantity);
@@ -255,7 +407,8 @@ class _POSDashboardScreenState extends State<POSDashboardScreen> {
         return Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: SariColors.backgroundWhite,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.1),
@@ -264,105 +417,84 @@ class _POSDashboardScreenState extends State<POSDashboardScreen> {
               ),
             ],
           ),
-          child: SafeArea(
-            child: Row(
-              children: [
-                // Cart Icon and Item Count
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1565C0),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
                     children: [
-                      const Icon(Icons.shopping_cart, color: Colors.white, size: 18),
-                      const SizedBox(width: 4),
-                      Text(
-                        '$itemCount',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: SariColors.primaryGreen.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.shopping_cart, color: SariColors.primaryGreen),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '$itemCount items',
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (discount > 0)
+                              Text(
+                                'Subtotal: ₱${subtotal.toStringAsFixed(2)}',
+                                style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            Text(
+                              'Total: ₱${total.toStringAsFixed(2)}',
+                              style: const TextStyle(color: SariColors.primaryGreen, fontWeight: FontWeight.bold, fontSize: 14),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(width: 8),
-                // Price Information
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          'Subtotal: ₱${subtotal.toStringAsFixed(2)}',
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ),
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          'Total: ₱${total.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                    ],
+                  TextButton(
+                    onPressed: () {
+                      context.read<CartCubit>().clearCart();
+                      _discountController.clear();
+                    },
+                    child: const Text('Clear', style: TextStyle(color: SariColors.error)),
                   ),
-                ),
-                const SizedBox(width: 8),
-                // Action Buttons
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (items.isNotEmpty)
-                      IconButton(
-                        onPressed: () {
-                          context.read<CartCubit>().clearCart();
-                          _discountController.clear();
-                        },
-                        icon: Icon(Icons.delete_outline, color: Colors.red.shade400, size: 22),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: items.isEmpty
-                          ? null
-                          : () => _showCheckoutSheet(context, 'Cash'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        minimumSize: const Size(0, 40),
-                      ),
-                      child: const Text('Checkout', style: TextStyle(fontSize: 13)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: SariActionButton(
+                      label: 'Utang',
+                      isPrimary: false,
+                      onPressed: () => _showUtangCheckoutSheet(context),
                     ),
-                  ],
-                ),
-              ],
-            ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SariActionButton(
+                      label: 'Checkout',
+                      onPressed: () => context.read<CartCubit>().checkout(paymentMethod: 'Cash'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         );
       },
     );
-  }
-
-  void _showCheckoutSheet(BuildContext context, String paymentMethod) {
-    if (paymentMethod == 'Utang') {
-      _showUtangCheckoutSheet(context);
-    } else {
-      context.read<CartCubit>().checkout(paymentMethod: 'Cash');
-    }
   }
 
   void _showUtangCheckoutSheet(BuildContext context) {
@@ -379,7 +511,7 @@ class _POSDashboardScreenState extends State<POSDashboardScreen> {
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
-            return Padding(
+            return SingleChildScrollView(
               padding: EdgeInsets.only(
                 left: 24,
                 right: 24,
@@ -394,9 +526,13 @@ class _POSDashboardScreenState extends State<POSDashboardScreen> {
                     children: [
                       Icon(Icons.credit_card, color: Colors.orange.shade700),
                       const SizedBox(width: 8),
-                      Text(
-                        'UTANG (Credit) Checkout',
-                        style: Theme.of(context).textTheme.titleLarge,
+                      Flexible(
+                        child: Text(
+                          'UTANG (Credit) Checkout',
+                          style: Theme.of(context).textTheme.titleLarge,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
                       ),
                     ],
                   ),
@@ -452,7 +588,8 @@ class _POSDashboardScreenState extends State<POSDashboardScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  ElevatedButton.icon(
+                  SariActionButton(
+                    label: 'Confirm Credit Sale',
                     onPressed: () {
                       if (customerNameController.text.trim().isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -473,13 +610,6 @@ class _POSDashboardScreenState extends State<POSDashboardScreen> {
                           );
                       Navigator.pop(context);
                     },
-                    icon: const Icon(Icons.check),
-                    label: const Text('Confirm Credit Sale'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
                   ),
                 ],
               ),

@@ -19,12 +19,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   List<Product> _products = [];
   List<Product> _filteredProducts = [];
   bool _isLoading = true;
-  final Map<String, int> _selectedItems = {};
 
   @override
   void initState() {
     super.initState();
     _loadProducts();
+    // Initialize discount controller from current cart state
+    final cartCubit = context.read<CartCubit>();
+    if (cartCubit.state is CartLoaded) {
+      final discount = (cartCubit.state as CartLoaded).discount;
+      if (discount > 0) {
+        _discountController.text = discount.toString();
+      }
+    }
   }
 
   void _loadProducts() {
@@ -52,74 +59,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
   }
 
-  void _addItem(Product product) {
-    setState(() {
-      _selectedItems[product.id] = (_selectedItems[product.id] ?? 0) + 1;
-    });
-  }
-
-  void _removeItem(Product product) {
-    setState(() {
-      final currentQty = _selectedItems[product.id] ?? 0;
-      if (currentQty > 0) {
-        _selectedItems[product.id] = currentQty - 1;
-        if (_selectedItems[product.id] == 0) {
-          _selectedItems.remove(product.id);
-        }
-      }
-    });
-  }
-
-  void _updateQuantity(Product product, int quantity) {
-    setState(() {
-      if (quantity > 0) {
-        _selectedItems[product.id] = quantity;
-      } else {
-        _selectedItems.remove(product.id);
-      }
-    });
-  }
-
-  double _calculateSubtotal() {
-    double total = 0;
-    _selectedItems.forEach((productId, qty) {
-      final product = _products.firstWhere(
-        (p) => p.id == productId,
-        orElse: () => Product(
-          id: productId,
-          name: '',
-          category: '',
-          costPrice: 0,
-          sellingPrice: 0,
-          stockQuantity: 0,
-        ),
-      );
-      total += product.sellingPrice * qty;
-    });
-    return total;
-  }
-
-  List<MapEntry<Product, int>> get _cartItems {
-    final entries = <MapEntry<Product, int>>[];
-    _selectedItems.forEach((productId, qty) {
-      final product = _products.firstWhere(
-        (p) => p.id == productId,
-        orElse: () => Product(
-          id: productId,
-          name: '',
-          category: '',
-          costPrice: 0,
-          sellingPrice: 0,
-          stockQuantity: 0,
-        ),
-      );
-      if (product.name.isNotEmpty) {
-        entries.add(MapEntry(product, qty));
-      }
-    });
-    return entries;
-  }
-
   @override
   void dispose() {
     _searchController.dispose();
@@ -129,80 +68,181 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final subtotal = _calculateSubtotal();
-    final discount = double.tryParse(_discountController.text) ?? 0.0;
-    final total = subtotal - discount;
+    return BlocBuilder<CartCubit, CartState>(
+      builder: (context, cartState) {
+        final items = cartState is CartLoaded ? cartState.items : <CartItem>[];
+        final subtotal = items.fold(0.0, (sum, item) => sum + (item.product.sellingPrice * item.quantity));
+        final discount = cartState is CartLoaded ? cartState.discount : 0.0;
+        final total = subtotal - discount;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Checkout'),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Row(
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: TextField(
-                          controller: _searchController,
-                          decoration: InputDecoration(
-                            hintText: 'Search products by name or barcode...',
-                            prefixIcon: const Icon(Icons.search),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Checkout'),
+            backgroundColor: Colors.transparent,
+            surfaceTintColor: Colors.transparent,
+            elevation: 0,
+            flexibleSpace: Container(
+              decoration: const BoxDecoration(
+                gradient: SariGradients.appBar,
+              ),
+            ),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+          body: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isMobile = constraints.maxWidth < 600;
+
+                    if (isMobile) {
+                      return Column(
+                        children: [
+                          Expanded(
+                            child: _buildProductListSection(),
                           ),
-                          onChanged: _filterProducts,
+                          SizedBox(
+                            height: 1,
+                            child: ColoredBox(color: Theme.of(context).dividerColor),
+                          ),
+                          _buildMobileCartSummary(items, subtotal, discount, total),
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: _buildProductListSection(),
                         ),
-                      ),
-                      Expanded(
-                        child: _filteredProducts.isEmpty
-                            ? Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.search_off, size: 48, color: Colors.grey.shade400),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'No products found',
-                                      style: TextStyle(color: Colors.grey.shade600),
-                                    ),
-                                  ],
-                                ),
-                              )
-                            : ListView.builder(
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                                itemCount: _filteredProducts.length,
-                                itemBuilder: (context, index) {
-                                  final product = _filteredProducts[index];
-                                  final selectedQty = _selectedItems[product.id] ?? 0;
-                                  return _buildProductItem(product, selectedQty);
-                                },
-                              ),
+                        const SizedBox(
+                          width: 1,
+                        ),
+                        Expanded(
+                          flex: 1,
+                          child: _buildCartPane(items, subtotal, discount, total),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+        );
+      },
+    );
+  }
+
+  Widget _buildProductListSection() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Search products by name or barcode...',
+              prefixIcon: const Icon(Icons.search),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onChanged: _filterProducts,
+          ),
+        ),
+        Expanded(
+          child: _filteredProducts.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.search_off, size: 48, color: Colors.grey.shade400),
+                      const SizedBox(height: 8),
+                      Text(
+                        'No products found',
+                        style: TextStyle(color: Colors.grey.shade600),
                       ),
                     ],
                   ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: _filteredProducts.length,
+                  itemBuilder: (context, index) {
+                    final product = _filteredProducts[index];
+                    final cartItems = context.read<CartCubit>().state is CartLoaded
+                        ? (context.read<CartCubit>().state as CartLoaded).items
+                        : <CartItem>[];
+                    final cartItem = cartItems.firstWhere(
+                      (item) => item.product.id == product.id,
+                      orElse: () => CartItem(product: product, quantity: 0),
+                    );
+                    return _buildProductItem(product, cartItem.quantity);
+                  },
                 ),
-                Container(
-                  width: 1,
-                  color: Theme.of(context).dividerColor,
-                ),
-                Expanded(
-                  flex: 1,
-                  child: _buildCartPane(subtotal, discount, total),
-                ),
-              ],
-            ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMobileCartSummary(List<CartItem> items, double subtotal, double discount, double total) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: SariColors.backgroundWhite,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('${items.length} items selected', style: const TextStyle(fontWeight: FontWeight.bold)),
+              TextButton(
+                onPressed: () => _showMobileCartDetails(items, subtotal, discount, total),
+                child: const Text('View Cart'),
+              ),
+            ],
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Total: ₱${total.toStringAsFixed(2)}',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: SariColors.primaryGreen),
+              ),
+              ElevatedButton(
+                onPressed: items.isEmpty ? null : () => _showMobileCartDetails(items, subtotal, discount, total),
+                child: const Text('Checkout'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showMobileCartDetails(List<CartItem> items, double subtotal, double discount, double total) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+  return SizedBox(
+    height: MediaQuery.of(context).size.height * 0.85,
+    child: _buildCartPane(items, subtotal, discount, total),
+  );
+},
     );
   }
 
@@ -210,8 +250,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final isLowStock = product.stockQuantity <= product.minStockAlert;
     final isOutOfStock = product.stockQuantity == 0;
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        gradient: SariGradients.surfaceLight,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: SariColors.divider),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(
@@ -224,7 +269,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 child: product.imagePath != null && File(product.imagePath!).existsSync()
                     ? Image.file(File(product.imagePath!), fit: BoxFit.cover)
                     : Container(
-                        color: SariColors.backgroundLight,
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [SariColors.backgroundLight, Color(0xFFE8F0FE)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                        ),
                         child: Icon(Icons.inventory_2, color: Colors.grey.shade400, size: 24),
                       ),
               ),
@@ -243,11 +294,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   const SizedBox(height: 2),
                   Row(
                     children: [
-                      Text(
-                        '₱${product.sellingPrice.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.primary,
-                          fontWeight: FontWeight.bold,
+                      Flexible(
+                        child: Text(
+                          '₱${product.sellingPrice.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -279,11 +333,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               maxStock: product.stockQuantity,
               enabled: !isOutOfStock,
               onChanged: (newQty) {
-                if (newQty > selectedQty) {
-                  _addItem(product);
-                } else {
-                  _removeItem(product);
-                }
+                context.read<CartCubit>().updateQuantity(product.id, newQty, product: product);
               },
             ),
           ],
@@ -292,21 +342,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  Widget _buildCartPane(double subtotal, double discount, double total) {
-    final cartItems = _cartItems;
-
+  Widget _buildCartPane(List<CartItem> cartItems, double subtotal, double discount, double total) {
     return BlocConsumer<CartCubit, CartState>(
       listener: (context, state) {
-        if (state is CartSuccess) {
+        if (state is CartCheckoutSuccess) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(state.message),
               backgroundColor: Colors.green,
             ),
           );
-          _selectedItems.clear();
           _discountController.clear();
-          Navigator.pop(context);
+          context.read<AuditCubit>().loadAudit(DateTime.now());
+          context.read<DebtCubit>().refreshDebts(); // Add this
+          if (Navigator.of(context).canPop()) {
+            Navigator.pop(context);
+          }
         } else if (state is CartError) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -321,9 +372,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           children: [
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: SariColors.primaryGreen,
-                borderRadius: const BorderRadius.only(
+              decoration: const BoxDecoration(
+                gradient: SariGradients.primaryHorizontal,
+                borderRadius: BorderRadius.only(
                   topRight: Radius.circular(16),
                   bottomRight: Radius.circular(16),
                 ),
@@ -332,15 +383,49 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 children: [
                   const Icon(Icons.shopping_cart, color: Colors.white, size: 24),
                   const SizedBox(width: 8),
-                  Text(
-                    'Cart (${cartItems.length})',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
+                  Flexible(
+                    child: Text(
+                      'Cart (${cartItems.length})',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
                   ),
                 ],
               ),
+            ),
+            // "Reflect" Dashboard metrics here
+            BlocBuilder<AuditCubit, AuditState>(
+              builder: (context, auditState) {
+                if (auditState is AuditLoaded) {
+                  return Container(
+                    margin: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: SariColors.primaryGreen.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: SariColors.primaryGreen.withValues(alpha: 0.1)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Today\'s Sales:',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: SariColors.textSecondary),
+                        ),
+                        Text(
+                          '₱${auditState.summary.grossRevenue.toStringAsFixed(2)}',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: SariColors.primaryGreen),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
             ),
             Expanded(
               child: cartItems.isEmpty
@@ -354,8 +439,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       itemCount: cartItems.length,
                       itemBuilder: (context, index) {
-                        final entry = cartItems[index];
-                        return _buildCartItem(entry.key, entry.value);
+                        final item = cartItems[index];
+                        return _buildCartItem(item.product, item.quantity);
                       },
                     ),
             ),
@@ -364,49 +449,74 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               child: Column(
                 children: [
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Subtotal: '),
-                      Text(
-                        '₱${subtotal.toStringAsFixed(2)}',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      const Text(
+                        'Subtotal',
+                        style: TextStyle(fontWeight: FontWeight.w500, color: SariColors.textSecondary),
+                      ),
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: AlignmentDirectional.centerEnd,
+                          child: Text(
+                            '₱${subtotal.toStringAsFixed(2)}',
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                          ),
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Discount: '),
-                      Expanded(
+                      const Text(
+                        'Discount',
+                        style: TextStyle(fontWeight: FontWeight.w500, color: SariColors.textSecondary),
+                      ),
+                      SizedBox(
+                        width: 100,
                         child: TextField(
                           controller: _discountController,
                           keyboardType: TextInputType.number,
+                          textAlign: TextAlign.right,
                           decoration: const InputDecoration(
                             hintText: '0.00',
                             isDense: true,
                             contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                           ),
-                          onChanged: (_) => setState(() {}),
+                          onChanged: (value) {
+                            final d = double.tryParse(value) ?? 0.0;
+                            context.read<CartCubit>().setDiscount(d);
+                          },
                         ),
                       ),
                     ],
                   ),
-                  const Divider(),
+                  const Divider(height: 24),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        'Total:',
+                        'Total Payable',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      Text(
-                        '₱${total.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.primary,
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: AlignmentDirectional.centerEnd,
+                          child: Text(
+                            '₱${total.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -415,25 +525,53 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   Row(
                     children: [
                       Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: cartItems.isEmpty ? null : () => _checkout('Cash'),
-                          icon: const Icon(Icons.money),
-                          label: const Text('Cash'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: SariGradients.buttonSuccess,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.green.withValues(alpha: 0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: ElevatedButton.icon(
+                            onPressed: cartItems.isEmpty ? null : () => _checkout('Cash'),
+                            icon: const Icon(Icons.money),
+                            label: const Text('Cash'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              foregroundColor: Colors.white,
+                              shadowColor: Colors.transparent,
+                            ),
                           ),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: cartItems.isEmpty ? null : () => _showUtangDialog(),
-                          icon: const Icon(Icons.credit_card),
-                          label: const Text('Utang'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
-                            foregroundColor: Colors.white,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: SariGradients.buttonWarning,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.orange.withValues(alpha: 0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: ElevatedButton.icon(
+                            onPressed: cartItems.isEmpty ? null : () => _showUtangDialog(),
+                            icon: const Icon(Icons.credit_card),
+                            label: const Text('Utang'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              foregroundColor: Colors.white,
+                              shadowColor: Colors.transparent,
+                            ),
                           ),
                         ),
                       ),
@@ -445,10 +583,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       width: double.infinity,
                       child: TextButton(
                         onPressed: () {
-                          setState(() {
-                            _selectedItems.clear();
-                            _discountController.clear();
-                          });
+                          context.read<CartCubit>().clearCart();
+                          _discountController.clear();
                         },
                         child: const Text('Clear Cart'),
                       ),
@@ -464,8 +600,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildCartItem(Product product, int quantity) {
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        gradient: SariGradients.surfaceLight,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: SariColors.divider),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(8.0),
         child: Row(
@@ -478,9 +619,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   Text(
                     product.name,
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  const SizedBox(height: 2),
                   FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Text(
@@ -491,7 +633,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ],
               ),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 8),
             Expanded(
               flex: 2,
               child: FittedBox(
@@ -503,15 +645,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ),
               ),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 8),
             StockAwareQuantityInput(
               quantity: quantity,
               maxStock: product.stockQuantity,
-              onChanged: (newQty) => _updateQuantity(product, newQty),
+              onChanged: (newQty) => context.read<CartCubit>().updateQuantity(product.id, newQty, product: product),
             ),
             IconButton(
               icon: const Icon(Icons.delete, size: 16, color: Colors.red),
-              onPressed: () => _updateQuantity(product, 0),
+              onPressed: () => context.read<CartCubit>().removeFromCart(product.id),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
             ),
@@ -521,18 +663,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  void _checkout(String paymentMethod) {
-    final cartItems = _cartItems;
-    if (cartItems.isEmpty) return;
-
-    context.read<CartCubit>().clearCart();
-    for (final entry in cartItems) {
-      context.read<CartCubit>().addToCartWithQuantity(entry.key, entry.value);
-    }
-
+  Future<void> _checkout(String paymentMethod) async {
     final discount = double.tryParse(_discountController.text) ?? 0.0;
     context.read<CartCubit>().setDiscount(discount);
-    context.read<CartCubit>().checkout(paymentMethod: paymentMethod);
+    await context.read<CartCubit>().checkout(paymentMethod: paymentMethod);
   }
 
   void _showUtangDialog() {
@@ -549,7 +683,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
-            return Padding(
+            return SingleChildScrollView(
               padding: EdgeInsets.only(
                 left: 24,
                 right: 24,
@@ -564,9 +698,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     children: [
                       Icon(Icons.credit_card, color: Colors.orange.shade700),
                       const SizedBox(width: 8),
-                      Text(
-                        'UTANG (Credit) Checkout',
-                        style: Theme.of(context).textTheme.titleLarge,
+                      Flexible(
+                        child: Text(
+                          'UTANG (Credit) Checkout',
+                          style: Theme.of(context).textTheme.titleLarge,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
                       ),
                     ],
                   ),
@@ -622,44 +760,50 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      if (customerNameController.text.trim().isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Customer name is required'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                        return;
-                      }
-
-                      final cartItems = _cartItems;
-                      if (cartItems.isEmpty) return;
-
-                      context.read<CartCubit>().clearCart();
-                      for (final entry in cartItems) {
-                        context.read<CartCubit>().addToCartWithQuantity(entry.key, entry.value);
-                      }
-
-                      final discount = double.tryParse(_discountController.text) ?? 0.0;
-                      context.read<CartCubit>().setDiscount(discount);
-                      context.read<CartCubit>().checkout(
-                            paymentMethod: 'Utang',
-                            customerName: customerNameController.text.trim(),
-                            customerContact: customerContactController.text.trim().isNotEmpty
-                                ? customerContactController.text.trim()
-                                : null,
-                            dueDate: selectedDueDate,
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: SariGradients.buttonWarning,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.orange.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        if (customerNameController.text.trim().isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Customer name is required'),
+                              backgroundColor: Colors.red,
+                            ),
                           );
-                      Navigator.pop(context);
-                    },
-                    icon: const Icon(Icons.check),
-                    label: const Text('Confirm Credit Sale'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                          return;
+                        }
+
+                        final discount = double.tryParse(_discountController.text) ?? 0.0;
+                        context.read<CartCubit>().setDiscount(discount);
+                        context.read<CartCubit>().checkout(
+                              paymentMethod: 'Utang',
+                              customerName: customerNameController.text.trim(),
+                              customerContact: customerContactController.text.trim().isNotEmpty
+                                  ? customerContactController.text.trim()
+                                  : null,
+                              dueDate: selectedDueDate,
+                            );
+                        Navigator.pop(context);
+                      },
+                      icon: const Icon(Icons.check),
+                      label: const Text('Confirm Credit Sale'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        foregroundColor: Colors.white,
+                        shadowColor: Colors.transparent,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
                     ),
                   ),
                 ],

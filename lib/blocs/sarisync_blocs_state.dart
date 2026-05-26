@@ -113,11 +113,43 @@ class DebtInitial extends DebtState {}
 
 class DebtLoaded extends DebtState {
   final List<Debt> debts;
+  final String searchQuery;
+  final bool showOnlyActive;
 
-  const DebtLoaded(this.debts);
+  const DebtLoaded({
+    required this.debts,
+    this.searchQuery = '',
+    this.showOnlyActive = true,
+  });
+
+  List<Debt> get filteredDebts {
+    var filtered = showOnlyActive
+        ? debts.where((d) => d.status == 'Active').toList()
+        : debts;
+
+    if (searchQuery.isNotEmpty) {
+      filtered = filtered
+          .where((d) => d.customerName.toLowerCase().contains(searchQuery.toLowerCase()) ||
+              (d.customerContact?.toLowerCase().contains(searchQuery.toLowerCase()) ?? false))
+          .toList();
+    }
+    return filtered;
+  }
 
   @override
-  List<Object?> get props => [debts];
+  List<Object?> get props => [debts, searchQuery, showOnlyActive];
+
+  DebtLoaded copyWith({
+    List<Debt>? debts,
+    String? searchQuery,
+    bool? showOnlyActive,
+  }) {
+    return DebtLoaded(
+      debts: debts ?? this.debts,
+      searchQuery: searchQuery ?? this.searchQuery,
+      showOnlyActive: showOnlyActive ?? this.showOnlyActive,
+    );
+  }
 }
 
 class DebtError extends DebtState {
@@ -154,6 +186,35 @@ class AuditError extends AuditState {
   final String message;
 
   const AuditError(this.message);
+
+  @override
+  List<Object?> get props => [message];
+}
+
+abstract class ExpenseState extends Equatable {
+  const ExpenseState();
+
+  @override
+  List<Object?> get props => [];
+}
+
+class ExpenseInitial extends ExpenseState {}
+
+class ExpenseLoading extends ExpenseState {}
+
+class ExpenseLoaded extends ExpenseState {
+  final List<CashFlowLog> expenses;
+
+  const ExpenseLoaded(this.expenses);
+
+  @override
+  List<Object?> get props => [expenses];
+}
+
+class ExpenseError extends ExpenseState {
+  final String message;
+
+  const ExpenseError(this.message);
 
   @override
   List<Object?> get props => [message];
